@@ -3,15 +3,21 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>CD HUD Timer</title>
 
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<title>CD Timer HUD</title>
+
+<link
+    href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+    rel="stylesheet">
 
 <style>
 
 body{
-    background: radial-gradient(circle at top,#121212,#070707);
+    background:
+    radial-gradient(circle at top,#121212,#070707);
+
     color:#eee;
+
     min-height:100vh;
 }
 
@@ -22,20 +28,32 @@ body{
 
 .topbar{
     display:flex;
+
     justify-content:center;
+
     align-items:center;
+
     gap:10px;
+
     flex-wrap:wrap;
 }
 
 .hud-card{
-    background:rgba(255,255,255,.05);
-    border:1px solid rgba(255,255,255,.08);
+
+    background:
+    rgba(255,255,255,.05);
+
+    border:
+    1px solid rgba(255,255,255,.08);
+
     border-radius:12px;
+
     backdrop-filter: blur(8px);
 
     display:flex;
+
     justify-content:center;
+
     align-items:center;
 
     text-align:center;
@@ -48,59 +66,87 @@ body{
 }
 
 .status{
+
     width:18px;
+
     height:18px;
 
     border-radius:4px;
 
     background:#00ff88;
 
-    box-shadow:0 0 10px #00ff88;
+    box-shadow:
+    0 0 10px #00ff88;
 }
 
 .running{
+
     background:#ff4040 !important;
 
-    box-shadow:0 0 12px #ff4040 !important;
+    box-shadow:
+    0 0 12px #ff4040 !important;
 
-    animation:pulse 1s infinite;
+    animation:
+    pulse 1s infinite;
 }
 
 .finished{
+
     background:#00ff88 !important;
+
+    box-shadow:
+    0 0 10px #00ff88;
 }
 
 .timer{
+
     min-width:100px;
 
     font-weight:bold;
 
-    font-variant-numeric: tabular-nums;
+    font-variant-numeric:
+    tabular-nums;
 }
 
 .btn-hud{
+
     background:#1f1f1f;
 
     color:#ddd;
 
-    border:1px solid rgba(255,255,255,.12);
+    border:
+    1px solid rgba(255,255,255,.12);
 }
 
 .btn-hud:hover{
+
     color:white;
+
     border-color:#00ff88;
 }
 
-.btn-reset-all{
-    padding:10px 20px;
-    font-weight:bold;
+textarea{
+    background:#111 !important;
+
+    color:white !important;
+
+    border:
+    1px solid rgba(255,255,255,.1) !important;
 }
 
 @keyframes pulse{
 
-0%{opacity:1}
-50%{opacity:.4}
-100%{opacity:1}
+    0%{
+        opacity:1;
+    }
+
+    50%{
+        opacity:.4;
+    }
+
+    100%{
+        opacity:1;
+    }
 
 }
 
@@ -111,366 +157,515 @@ body{
 
 <div class="hud-wrap p-3">
 
-<h3 class="text-center mb-4">
-CD Timer HUD
-</h3>
+    <h3 class="text-center mb-4">
+        CD Timer HUD
+    </h3>
 
-<div class="topbar mb-4">
+    <div class="topbar mb-4">
 
-<span>Minuten:</span>
+        <span>Minuten:</span>
 
-<input
-id="minutesInput"
-class="form-control text-center"
-style="width:120px"
-value="18">
+        <input
+            id="minutesInput"
+            class="form-control text-center"
+            style="width:120px"
+            value="18">
 
-</div>
+    </div>
 
-<div id="list"></div>
+    <div id="list"></div>
 
-<!-- GLOBAL RESET -->
+    <div class="text-center mt-4">
 
-<div class="text-center mt-4">
+        <button
+            class="btn btn-danger"
+            onclick="resetAllTimers()">
 
-<button
-class="btn btn-danger btn-reset-all"
-onclick="resetAllTimers()">
+            ALLE TIMER RESETTEN
 
-ALLE TIMER RESETTEN
+        </button>
 
-</button>
+    </div>
 
-</div>
+    <div class="mt-4">
+
+        <textarea
+            id="shareData"
+            class="form-control mb-2"
+            rows="4"
+            placeholder="Export / Import String"></textarea>
+
+        <div class="d-flex justify-content-center gap-2 flex-wrap">
+
+            <button
+                class="btn btn-hud"
+                onclick="exportTimers()">
+
+                Export String
+
+            </button>
+
+            <button
+                class="btn btn-hud"
+                onclick="importTimers()">
+
+                Import String
+
+            </button>
+
+        </div>
+
+    </div>
 
 </div>
 
 <script>
 
-const list =
-document.getElementById(
-"list"
-);
+const list = document.getElementById("list");
 
 const intervals = {};
 
 for(let i=1;i<=8;i++){
 
-list.innerHTML += `
+    list.innerHTML += `
 
-<div class="hud-card p-3 mb-2">
+    <div class="hud-card p-3 mb-2">
 
-<div class="d-flex
-flex-wrap
-justify-content-center
-align-items-center
-gap-2
-w-100">
+        <div class="
+            d-flex
+            flex-wrap
+            justify-content-center
+            align-items-center
+            gap-2
+            w-100">
 
-<strong style="width:60px">
-CH${i}
-</strong>
+            <strong style="width:60px">
+                CH${i}
+            </strong>
 
-<button
-class="btn btn-hud btn-sm"
-onclick="start(${i})">
+            <button
+                class="btn btn-hud btn-sm"
+                onclick="start(${i})">
 
-Start
+                Start
 
-</button>
+            </button>
 
-<button
-class="btn btn-hud btn-sm"
-onclick="resetTimer(${i})">
+            <button
+                class="btn btn-hud btn-sm"
+                onclick="resetTimer(${i})">
 
-Reset
+                Reset
 
-</button>
+            </button>
 
-<span
-id="t${i}"
-class="timer">
+            <span
+                id="t${i}"
+                class="timer">
 
-READY
+                READY
 
-</span>
+            </span>
 
-<div
-id="s${i}"
-class="status finished">
+            <div
+                id="s${i}"
+                class="status finished">
 
-</div>
+            </div>
 
-</div>
+        </div>
 
-</div>
+    </div>
 
-`;
-
+    `;
 }
 
 function parseMinutes(input){
 
-const val =
-parseFloat(
-input.replace(",", ".")
-);
+    const val =
+    parseFloat(
+        input.replace(",", ".")
+    );
 
-if(isNaN(val) || val <= 0)
-return null;
+    if(
+        isNaN(val)
+        ||
+        val <= 0
+    ){
+        return null;
+    }
 
-const whole =
-Math.floor(val);
+    const whole =
+    Math.floor(val);
 
-const decimal =
-val - whole;
+    const decimal =
+    val - whole;
 
-const seconds =
-Math.round(decimal * 60);
+    const seconds =
+    Math.round(
+        decimal * 60
+    );
 
-return (whole * 60) + seconds;
-
+    return (whole * 60) + seconds;
 }
 
 function start(ch){
 
-resetInterval(ch);
+    resetInterval(ch);
 
-const duration =
-parseMinutes(
-document.getElementById(
-"minutesInput"
-).value
-);
+    const duration =
+    parseMinutes(
+        document.getElementById(
+            "minutesInput"
+        ).value
+    );
 
-if(!duration)
-return;
+    if(!duration){
+        return;
+    }
 
-localStorage.setItem(
+    localStorage.setItem(
 
-"timer_"+ch,
+        "timer_" + ch,
 
-JSON.stringify({
+        JSON.stringify({
 
-startTime:
-Date.now(),
+            startTime:
+            Date.now(),
 
-duration:
-duration
+            duration:
+            duration
 
-})
+        })
 
-);
+    );
 
-runTimer(ch);
-
-}
-
-function runTimer(ch){
-
-resetInterval(ch);
-
-const saved =
-JSON.parse(
-
-localStorage.getItem(
-"timer_"+ch
-)
-
-);
-
-if(!saved)
-return;
-
-let announced =
-false;
-
-const text =
-document.getElementById(
-"t"+ch
-);
-
-const status =
-document.getElementById(
-"s"+ch
-);
-
-intervals[ch] =
-setInterval(()=>{
-
-const elapsed =
-Math.floor(
-
-(
-Date.now()
--
-saved.startTime
-)
-
-/1000
-
-);
-
-const remaining =
-saved.duration
--
-elapsed;
-
-if(remaining > 0){
-
-text.innerText =
-format(
-remaining
-);
-
-status.classList.remove(
-"finished"
-);
-
-status.classList.add(
-"running"
-);
-
-}else{
-
-text.innerText =
-"+"
-+
-format(
-Math.abs(
-remaining
-)
-);
-
-status.classList.remove(
-"running"
-);
-
-status.classList.add(
-"finished"
-);
-
-if(!announced){
-
-speak(ch);
-
-announced = true;
+    runTimer(ch);
 
 }
 
-}
+function runTimer(ch, silent=false){
 
-},1000);
+    resetInterval(ch);
+
+    const saved =
+    JSON.parse(
+
+        localStorage.getItem(
+            "timer_" + ch
+        )
+
+    );
+
+    if(!saved){
+        return;
+    }
+
+    let announced =
+    silent;
+
+    const text =
+    document.getElementById(
+        "t"+ch
+    );
+
+    const status =
+    document.getElementById(
+        "s"+ch
+    );
+
+    intervals[ch] =
+    setInterval(()=>{
+
+        const elapsed =
+        Math.floor(
+
+            (
+                Date.now()
+                -
+                saved.startTime
+            )
+
+            /1000
+
+        );
+
+        const remaining =
+        saved.duration
+        -
+        elapsed;
+
+        if(remaining > 0){
+
+            text.innerText =
+            format(
+                remaining
+            );
+
+            status.classList.remove(
+                "finished"
+            );
+
+            status.classList.add(
+                "running"
+            );
+
+        }else{
+
+            text.innerText =
+            "+"
+            +
+            format(
+                Math.abs(
+                    remaining
+                )
+            );
+
+            status.classList.remove(
+                "running"
+            );
+
+            status.classList.add(
+                "finished"
+            );
+
+            if(!announced){
+
+                speak(ch);
+
+                announced = true;
+
+            }
+
+        }
+
+    },1000);
 
 }
 
 function resetTimer(ch){
 
-resetInterval(ch);
+    resetInterval(ch);
 
-localStorage.removeItem(
-"timer_"+ch
-);
+    localStorage.removeItem(
+        "timer_" + ch
+    );
 
-document.getElementById(
-"t"+ch
-).innerText =
-"READY";
+    document.getElementById(
+        "t"+ch
+    ).innerText =
+    "READY";
 
-const s =
-document.getElementById(
-"s"+ch
-);
+    const s =
+    document.getElementById(
+        "s"+ch
+    );
 
-s.classList.remove(
-"running"
-);
+    s.classList.remove(
+        "running"
+    );
 
-s.classList.add(
-"finished"
-);
+    s.classList.add(
+        "finished"
+    );
 
 }
-
-/* GLOBAL RESET */
 
 function resetAllTimers(){
 
-for(let ch=1; ch<=8; ch++){
+    for(
+        let ch=1;
+        ch<=8;
+        ch++
+    ){
 
-resetTimer(ch);
+        resetTimer(ch);
+
+    }
 
 }
+
+function exportTimers(){
+
+    document.getElementById(
+        "shareData"
+    ).value = "";
+
+    const data = {};
+
+    for(
+        let ch=1;
+        ch<=8;
+        ch++
+    ){
+
+        const timer =
+        localStorage.getItem(
+            "timer_" + ch
+        );
+
+        if(timer){
+
+            data[ch] =
+            JSON.parse(
+                timer
+            );
+
+        }
+
+    }
+
+    const encoded =
+    btoa(
+        JSON.stringify(
+            data
+        )
+    );
+
+    document.getElementById(
+        "shareData"
+    ).value =
+    encoded;
+
+    navigator.clipboard.writeText(
+        encoded
+    );
+
+}
+
+function importTimers(){
+
+    try{
+
+        const encoded =
+        document.getElementById(
+            "shareData"
+        )
+        .value
+        .trim();
+
+        if(!encoded){
+            return;
+        }
+
+        const decoded =
+        atob(
+            encoded
+        );
+
+        const data =
+        JSON.parse(
+            decoded
+        );
+
+        resetAllTimers();
+
+        for(
+            const ch in data
+        ){
+
+            localStorage.setItem(
+
+                "timer_" + ch,
+
+                JSON.stringify(
+                    data[ch]
+                )
+
+            );
+
+            runTimer(
+                Number(ch),
+                true
+            );
+
+        }
+
+    }catch{
+
+        alert(
+            "Ungültiger String"
+        );
+
+    }
 
 }
 
 function resetInterval(ch){
 
-if(intervals[ch]){
+    if(
+        intervals[ch]
+    ){
 
-clearInterval(
-intervals[ch]
-);
+        clearInterval(
+            intervals[ch]
+        );
 
-}
+    }
 
 }
 
 function format(sec){
 
-const m =
-Math.floor(sec/60);
+    const m =
+    Math.floor(
+        sec / 60
+    );
 
-const s =
-sec % 60;
+    const s =
+    sec % 60;
 
-return `${m}:${
-String(s)
-.padStart(2,"0")
-}`;
+    return `${m}:${String(s).padStart(2,"0")}`;
 
 }
 
 function speak(ch){
 
-const msg =
-new SpeechSynthesisUtterance(
+    const msg =
+    new SpeechSynthesisUtterance(
 
-`C H ${ch} ready`
+        `C H ${ch} ready`
 
-);
+    );
 
-msg.lang =
-"de-DE";
+    msg.lang =
+    "de-DE";
 
-msg.rate =
-0.9;
+    msg.rate =
+    0.9;
 
-window
-.speechSynthesis
-.speak(
-msg
-);
+    window
+    .speechSynthesis
+    .speak(
+        msg
+    );
 
 }
 
 window.onload = ()=>{
 
-for(let ch=1; ch<=8; ch++){
+    for(
+        let ch=1;
+        ch<=8;
+        ch++
+    ){
 
-if(
+        if(
 
-localStorage.getItem(
-"timer_"+ch
-)
+            localStorage.getItem(
+                "timer_" + ch
+            )
 
-){
+        ){
 
-runTimer(ch);
+            runTimer(
+                ch,
+                true
+            );
 
-}
+        }
 
-}
+    }
 
 };
 
