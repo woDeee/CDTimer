@@ -1,439 +1,448 @@
 <!DOCTYPE html>
 <html lang="de">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-
-<title>CD Timer HUD</title>
-
-<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-database-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
-
-<style>
-
-body{
-    margin:0;
-    background:#0b0b0b;
-    color:#fff;
-    font-family:Arial;
-}
-
-.topbar{
-    display:flex;
-    justify-content:space-between;
-    padding:10px;
-    background:#111;
-    border-bottom:1px solid #222;
-    flex-wrap:wrap;
-    align-items:center;
-}
-
-input,button{
-    padding:6px;
-    background:#1a1a1a;
-    border:1px solid #333;
-    color:#fff;
-}
-
-.container{
-    max-width:1000px;
-    margin:auto;
-    padding:10px;
-}
-
-.hidden{display:none;}
-
-.main{
-    display:flex;
-    gap:30px;
-}
-
-/* SETTINGS */
-.settings{
-    display:none;
-    justify-content:center;
-    align-items:center;
-    gap:12px;
-    margin:15px 0 25px 0;
-}
-
-.settings.active{
-    display:flex;
-}
-
-/* TIMER */
-.timers{flex:2;}
-
-.usersPanel{
-    flex:1;
-    background:#111;
-    border:1px solid #333;
-    border-radius:10px;
-    padding:10px;
-    display:none;
-    flex-direction:column;
-}
-
-.usersPanel.active{display:flex;}
-
-/* FIXED SCROLL AREAS */
-#userList{
-    flex:1;
-    overflow-y:auto;
-    max-height:50%;
-}
-
-.chatBox{
-    flex:1;
-    display:flex;
-    flex-direction:column;
-    border-top:1px solid #222;
-    margin-top:10px;
-    padding-top:10px;
-    max-height:50%;
-    overflow:hidden;
-}
-
-#chatBox{
-    flex:1;
-    overflow-y:auto;
-    background:#0b0b0b;
-    border:1px solid #333;
-    padding:8px;
-}
-
-/* CHAT INPUT ROW FIX */
-.chatInputRow{
-    display:flex;
-    gap:5px;
-    margin-top:6px;
-}
-
-.chatInputRow input{
-    flex:1;
-}
-
-.chatInputRow button{
-    width:90px;
-}
-
-/* TIMER CARD */
-.hud-card{
-    background:rgba(255,255,255,0.04);
-    border:1px solid rgba(255,255,255,0.1);
-    border-radius:10px;
-    padding:12px;
-    margin-bottom:10px;
-    display:grid;
-    grid-template-columns:80px 1fr 140px;
-}
-
-.center{display:flex;gap:8px;justify-content:center;}
-.right{display:flex;gap:10px;justify-content:flex-end;align-items:center;}
-
-.dot{width:12px;height:12px;border-radius:50%;}
-.green{background:#00ff88}
-.red{background:#ff4040}
-.orange{background:#ff9f1a}
-
-.orangeWarn{
-    border:2px solid #ff9f1a !important;
-    animation:blink .6s infinite;
-}
-
-@keyframes blink{
-    50%{opacity:.4}
-}
-
-/* TOAST */
-#toast{
-position:fixed;
-bottom:30px;
-left:50%;
-transform:translateX(-50%);
-background:#111;
-border:1px solid #333;
-padding:14px 20px;
-border-radius:10px;
-font-size:14px;
-display:none;
-z-index:9999;
-}
-
-</style>
-</head>
-
-<body>
-
-<div class="topbar">
-
-<div>
-<strong>CD TIMER HUD</strong><br>
-<span id="roomLabel">NO ROOM</span>
-</div>
-
-<div>
-<input id="username" placeholder="Username">
-</div>
-
-<div>
-<input id="roomInput" placeholder="Room">
-<button onclick="joinRoom()">Join</button>
-<button onclick="createRoom()">Create</button>
-</div>
-
-</div>
-
-<div class="container">
-
-<div class="settings" id="settings">
-<label>Minuten:</label>
-<input id="minutesInput" value="19">
-
-<label style="display:flex;align-items:center;gap:6px;">
-<input type="checkbox" id="muteVoice">
-Mute
-</label>
-</div>
-
-<div class="main">
-
-<div class="timers">
-<div id="list" class="hidden"></div>
-</div>
-
-<div class="usersPanel" id="usersBox">
-<strong>Users</strong>
-<div id="userList"></div>
-
-<div class="chatBox">
-<strong>Chat</strong>
-<div id="chatBox"></div>
-
-<div class="chatInputRow">
-<input id="chatInput" placeholder="Message">
-<button onclick="sendChat()">Send</button>
-</div>
-
-</div>
-</div>
-
-</div>
-
-</div>
-
-<div id="toast"></div>
-
-<script>
-
-const firebaseConfig = {
-  apiKey: "AIzaSyCx52T35a9Jvsrbl51abjdN0hsSxo7z27M",
-  authDomain: "metin-cdtimer.firebaseapp.com",
-  databaseURL: "https://metin-cdtimer-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: "metin-cdtimer",
-  storageBucket: "metin-cdtimer.firebasestorage.app",
-  messagingSenderId: "76292108896",
-  appId: "1:76292108896:web:6030d1d5c7ccfea7d44905",
-  measurementId: "G-85TB0NSB8X"
-};
-
-firebase.initializeApp(firebaseConfig);
-firebase.auth().signInAnonymously();
-
-const db=firebase.database();
-
-let ROOM=null;
-let timersData={};
-let lastRemaining={};
-
-/* SPEAK (UNCHANGED) */
-function speak(text){
-
-if(document.getElementById("muteVoice").checked) return;
-
-if(speechSynthesis.speaking){
-    speechSynthesis.cancel();
-}
-
-setTimeout(() => {
-
-const msg = new SpeechSynthesisUtterance(text);
-msg.lang = "de-DE";
-msg.rate = 1;
-msg.volume = 1;
-
-const voices = speechSynthesis.getVoices();
-if(voices.length){
-    msg.voice = voices.find(v => v.lang.includes("de")) || voices[0];
-}
-
-speechSynthesis.speak(msg);
-
-}, 50);
-
-}
-
-document.body.addEventListener("click", () => {
-speechSynthesis.getVoices();
-}, { once:true });
-
-/* TOAST */
-function showMessage(msg){
-const t=document.getElementById("toast");
-t.innerText=msg;
-t.style.display="block";
-setTimeout(()=>t.style.display="none",2500);
-}
-
-/* ROOM */
-function setRoom(r){
-ROOM=r;
-
-document.getElementById("roomLabel").innerText=r;
-document.getElementById("list").classList.remove("hidden");
-
-document.getElementById("settings").classList.add("active");
-document.getElementById("usersBox").classList.add("active");
-
-listenRoom();
-listenChat();
-listenUsers();
-registerUser();
-}
-
-/* VALIDATION */
-function requireUsername(){
-const u=document.getElementById("username").value.trim();
-if(!u){
-showMessage("⚠ Bitte Username eingeben");
-return null;
-}
-return u;
-}
-
-/* JOIN / CREATE (UNCHANGED) */
-function joinRoom(){
-const room=document.getElementById("roomInput").value.trim();
-if(!room) return showMessage("⚠ Room Name fehlt");
-
-const user=requireUsername();
-if(!user) return;
-
-db.ref(`rooms/${room}`).once("value",snap=>{
-if(!snap.exists()){
-showMessage("❌ Channel existiert nicht");
-return;
-}
-
-setRoom(room);
-showMessage("🔵 Verbunden mit Channel");
-});
-}
-
-function createRoom(){
-const room=document.getElementById("roomInput").value.trim();
-if(!room) return showMessage("⚠ Room Name fehlt");
-
-const user=requireUsername();
-if(!user) return;
-
-db.ref(`rooms/${room}`).once("value",snap=>{
-
-if(snap.exists()){
-showMessage("⚠ Channel existiert bereits – verbunden");
-setRoom(room);
-return;
-}
-
-db.ref(`rooms/${room}`).set({
-createdAt:Date.now()
-});
-
-setRoom(room);
-showMessage("✅ Channel erstellt");
-});
-}
-
-/* USERS */
-function registerUser(){
-const uid=firebase.auth().currentUser.uid;
-const name=document.getElementById("username").value.trim() || "User";
-
-db.ref(`rooms/${ROOM}/users/${uid}`).set(name);
-db.ref(`rooms/${ROOM}/users/${uid}`).onDisconnect().remove();
-}
-
-function listenUsers(){
-db.ref(`rooms/${ROOM}/users`).on("value",snap=>{
-const data=snap.val()||{};
-document.getElementById("userList").innerHTML=
-Object.values(data).map(u=>`<div>🟩 ${u}</div>`).join("");
-});
-}
-
-/* CHAT SEND (FIX: CLEAR INPUT) */
-function sendChat(){
-const input=document.getElementById("chatInput");
-const text=input.value.trim();
-if(!text) return;
-
-db.ref(`rooms/${ROOM}/chat`).push({
-user:document.getElementById("username").value.trim() || "User",
-text,
-timestamp:Date.now()
-});
-
-/* 🔥 CLEAR INPUT AFTER SEND */
-input.value="";
-}
-
-/* CHAT LIST (FIX: DATE BEFORE TIME) */
-function listenChat(){
-db.ref(`rooms/${ROOM}/chat`)
-.limitToLast(10)
-.on("value",snap=>{
-
-const data=snap.val()||{};
-const box=document.getElementById("chatBox");
-
-const msgs=Object.values(data).sort((a,b)=>a.timestamp-b.timestamp);
-
-box.innerHTML=msgs.map(m=>{
-const d=new Date(m.timestamp);
-
-const date = d.toLocaleDateString("de-DE");
-const time = d.toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"});
-
-return `
+
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <title>CD Timer HUD</title>
+
+    <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-database-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
+
+    <style>
+      body {
+        margin: 0;
+        background: #0b0b0b;
+        color: #fff;
+        font-family: Arial;
+      }
+
+      .topbar {
+        display: flex;
+        justify-content: space-between;
+        padding: 10px;
+        background: #111;
+        border-bottom: 1px solid #222;
+        flex-wrap: wrap;
+        align-items: center;
+      }
+
+      input,
+      button {
+        padding: 6px;
+        background: #1a1a1a;
+        border: 1px solid #333;
+        color: #fff;
+      }
+
+      .container {
+        max-width: 1000px;
+        margin: auto;
+        padding: 10px;
+      }
+
+      .hidden {
+        display: none;
+      }
+
+      .main {
+        display: flex;
+        gap: 30px;
+      }
+
+      /* SETTINGS */
+      .settings {
+        display: none;
+        justify-content: center;
+        align-items: center;
+        gap: 12px;
+        margin: 15px 0 25px 0;
+      }
+
+      .settings.active {
+        display: flex;
+      }
+
+      .timers {
+        flex: 2;
+      }
+
+      .usersPanel {
+        flex: 1;
+        background: #111;
+        border: 1px solid #333;
+        border-radius: 10px;
+        padding: 10px;
+        display: none;
+        flex-direction: column;
+      }
+
+      .usersPanel.active {
+        display: flex;
+      }
+
+      /* FIXED SCROLL AREAS */
+      #userList {
+        flex: 1;
+        overflow-y: auto;
+        max-height: 50%;
+      }
+
+      .chatBox {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        border-top: 1px solid #222;
+        margin-top: 10px;
+        padding-top: 10px;
+        max-height: 50%;
+        overflow: hidden;
+      }
+
+      #chatBox {
+        flex: 1;
+        overflow-y: auto;
+        background: #0b0b0b;
+        border: 1px solid #333;
+        padding: 8px;
+      }
+
+      /* CHAT INPUT ROW FIX */
+      .chatInputRow {
+        display: flex;
+        gap: 5px;
+        margin-top: 6px;
+      }
+
+      .chatInputRow input {
+        flex: 1;
+      }
+
+      .chatInputRow button {
+        width: 90px;
+      }
+
+      /* TIMER CARD */
+      .hud-card {
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 10px;
+        padding: 12px;
+        margin-bottom: 10px;
+        display: grid;
+        grid-template-columns: 80px 1fr 140px;
+      }
+
+      .center {
+        display: flex;
+        gap: 8px;
+        justify-content: center;
+      }
+
+      .right {
+        display: flex;
+        gap: 10px;
+        justify-content: flex-end;
+        align-items: center;
+      }
+
+      .dot {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+      }
+
+      .green {
+        background: #00ff88
+      }
+
+      .red {
+        background: #ff4040
+      }
+
+      .orange {
+        background: #ff9f1a
+      }
+
+      .orangeWarn {
+        border: 2px solid #ff9f1a !important;
+        animation: blink .6s infinite;
+      }
+
+      @keyframes blink {
+        50% {
+          opacity: .4
+        }
+      }
+
+      /* TOAST */
+      #toast {
+        position: fixed;
+        bottom: 30px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: #111;
+        border: 1px solid #333;
+        padding: 14px 20px;
+        border-radius: 10px;
+        font-size: 14px;
+        display: none;
+        z-index: 9999;
+      }
+    </style>
+  </head>
+
+  <body>
+
+    <div class="topbar">
+
+      <div>
+        <strong>CD TIMER HUD</strong><br>
+        <span id="roomLabel">NO ROOM</span>
+      </div>
+
+      <!-- USERNAME -->
+      <div id="usernameBox">
+        <input id="username" placeholder="Username">
+      </div>
+
+      <!-- ROOM ACTIONS -->
+      <div id="roomActions">
+        <input id="roomInput" placeholder="Room">
+        <button onclick="joinRoom()">Join</button>
+        <button onclick="createRoom()">Create</button>
+      </div>
+
+      <!-- LEAVE -->
+      <div id="leaveBox" class="hidden">
+        <button onclick="leaveRoom()" style="background:#ff4040;border-color:#ff4040;">
+          Leave Channel
+        </button>
+      </div>
+
+    </div>
+
+    <div class="container">
+
+      <div class="settings" id="settings">
+        <label>Minuten:</label>
+        <input id="minutesInput" value="19">
+
+        <label style="display:flex;align-items:center;gap:6px;">
+          <input type="checkbox" id="muteVoice">
+          Mute
+        </label>
+      </div>
+
+      <div class="main">
+
+        <div class="timers">
+          <div id="list" class="hidden"></div>
+        </div>
+
+        <div class="usersPanel" id="usersBox">
+          <strong>Users</strong>
+          <div id="userList"></div>
+
+          <div class="chatBox">
+            <strong>Chat</strong>
+            <div id="chatBox"></div>
+
+            <div class="chatInputRow">
+              <input id="chatInput" placeholder="Message">
+              <button onclick="sendChat()">Send</button>
+            </div>
+
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+    <div id="toast"></div>
+
+    <script>
+      const firebaseConfig = {
+        apiKey: "AIzaSyCx52T35a9Jvsrbl51abjdN0hsSxo7z27M",
+        authDomain: "metin-cdtimer.firebaseapp.com",
+        databaseURL: "https://metin-cdtimer-default-rtdb.europe-west1.firebasedatabase.app",
+        projectId: "metin-cdtimer",
+        storageBucket: "metin-cdtimer.firebasestorage.app",
+        messagingSenderId: "76292108896",
+        appId: "1:76292108896:web:6030d1d5c7ccfea7d44905",
+        measurementId: "G-85TB0NSB8X"
+      };
+      firebase.initializeApp(firebaseConfig);
+      firebase.auth().signInAnonymously();
+      const db = firebase.database();
+      let ROOM = null;
+      let timersData = {};
+      let lastRemaining = {};
+      /* UI STATE CONTROL (NEW) */
+      function updateUI() {
+        const inRoom = !!ROOM;
+        document.getElementById("roomActions").classList.toggle("hidden", inRoom);
+        document.getElementById("usernameBox").classList.toggle("hidden", inRoom);
+        document.getElementById("leaveBox").classList.toggle("hidden", !inRoom);
+      }
+      /* SPEAK (UNCHANGED) */
+      function speak(text) {
+        if (document.getElementById("muteVoice").checked) return;
+        if (speechSynthesis.speaking) {
+          speechSynthesis.cancel();
+        }
+        setTimeout(() => {
+          const msg = new SpeechSynthesisUtterance(text);
+          msg.lang = "de-DE";
+          msg.rate = 1;
+          msg.volume = 1;
+          const voices = speechSynthesis.getVoices();
+          if (voices.length) {
+            msg.voice = voices.find(v => v.lang.includes("de")) || voices[0];
+          }
+          speechSynthesis.speak(msg);
+        }, 50);
+      }
+      /* TOAST */
+      function showMessage(msg) {
+        const t = document.getElementById("toast");
+        t.innerText = msg;
+        t.style.display = "block";
+        setTimeout(() => t.style.display = "none", 2500);
+      }
+      /* SET ROOM */
+      function setRoom(r) {
+        ROOM = r;
+        document.getElementById("roomLabel").innerText = r;
+        document.getElementById("list").classList.remove("hidden");
+        document.getElementById("settings").classList.add("active");
+        document.getElementById("usersBox").classList.add("active");
+        updateUI();
+        listenRoom();
+        listenChat();
+        listenUsers();
+        registerUser();
+      }
+      /* LEAVE */
+      function leaveRoom() {
+        if (ROOM) {
+          db.ref(`rooms/${ROOM}/users/${firebase.auth().currentUser.uid}`).remove();
+        }
+        ROOM = null;
+        timersData = {};
+        lastRemaining = {};
+        document.getElementById("roomLabel").innerText = "NO ROOM";
+        document.getElementById("list").classList.add("hidden");
+        document.getElementById("settings").classList.remove("active");
+        document.getElementById("usersBox").classList.remove("active");
+        updateUI();
+      }
+      /* VALIDATION */
+      function requireUsername() {
+        const u = document.getElementById("username").value.trim();
+        if (!u) {
+          showMessage("⚠ Bitte Username eingeben");
+          return null;
+        }
+        return u;
+      }
+      /* JOIN / CREATE */
+      function joinRoom() {
+        const room = document.getElementById("roomInput").value.trim();
+        if (!room) return showMessage("⚠ Room Name fehlt");
+        const user = requireUsername();
+        if (!user) return;
+        db.ref(`rooms/${room}`).once("value", snap => {
+          if (!snap.exists()) {
+            showMessage("❌ Channel existiert nicht");
+            return;
+          }
+          setRoom(room);
+          showMessage("🔵 Verbunden mit Channel");
+        });
+      }
+
+      function createRoom() {
+        const room = document.getElementById("roomInput").value.trim();
+        if (!room) return showMessage("⚠ Room Name fehlt");
+        const user = requireUsername();
+        if (!user) return;
+        db.ref(`rooms/${room}`).once("value", snap => {
+          if (snap.exists()) {
+            setRoom(room);
+            showMessage("⚠ Channel existiert bereits – verbunden");
+            return;
+          }
+          db.ref(`rooms/${room}`).set({
+            createdAt: Date.now()
+          });
+          setRoom(room);
+          showMessage("✅ Channel erstellt");
+        });
+      }
+      /* USERS */
+      function registerUser() {
+        const uid = firebase.auth().currentUser.uid;
+        const name = document.getElementById("username").value.trim() || "User";
+        db.ref(`rooms/${ROOM}/users/${uid}`).set(name);
+        db.ref(`rooms/${ROOM}/users/${uid}`).onDisconnect().remove();
+      }
+
+      function listenUsers() {
+        db.ref(`rooms/${ROOM}/users`).on("value", snap => {
+          const data = snap.val() || {};
+          document.getElementById("userList").innerHTML =
+            Object.values(data).map(u => `<div>🟩 ${u}</div>`).join("");
+        });
+      }
+      /* CHAT */
+      function sendChat() {
+        const input = document.getElementById("chatInput");
+        const text = input.value.trim();
+        if (!text) return;
+        db.ref(`rooms/${ROOM}/chat`).push({
+          user: document.getElementById("username").value.trim() || "User",
+          text,
+          timestamp: Date.now()
+        });
+        input.value = "";
+      }
+      /* CHAT LIST */
+      function listenChat() {
+        db.ref(`rooms/${ROOM}/chat`)
+          .limitToLast(10)
+          .on("value", snap => {
+            const data = snap.val() || {};
+            const box = document.getElementById("chatBox");
+            const msgs = Object.values(data).sort((a, b) => a.timestamp - b.timestamp);
+            box.innerHTML = msgs.map(m => {
+              const d = new Date(m.timestamp);
+              return `
 <div style="border-bottom:1px solid #222;margin-bottom:6px;padding-bottom:6px;">
 <div style="font-size:11px;color:#888">
-${date} ${time}
+${d.toLocaleDateString("de-DE")} ${d.toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"})}
 • <span style="color:#00ff88">${m.user}</span>
 </div>
 <div>${m.text}</div>
 </div>`;
-}).join("");
-
-box.scrollTop=box.scrollHeight;
-
-});
-}
-
-/* TIMER (UNCHANGED) */
-function listenRoom(){
-db.ref(`rooms/${ROOM}/timers`).on("value",snap=>{
-timersData=snap.val()||{};
-renderAll();
-});
-}
-
-setInterval(renderAll,1000);
-
-const list=document.getElementById("list");
-
-for(let i=1;i<=8;i++){
-list.innerHTML+=`
+            }).join("");
+            box.scrollTop = box.scrollHeight;
+          });
+      }
+      /* TIMER */
+      function listenRoom() {
+        db.ref(`rooms/${ROOM}/timers`).on("value", snap => {
+          timersData = snap.val() || {};
+          renderAll();
+        });
+      }
+      setInterval(renderAll, 1000);
+      const list = document.getElementById("list");
+      for (let i = 1; i <= 8; i++) {
+        list.innerHTML += `
 <div class="hud-card" id="card${i}">
 <div><strong>CH${i}</strong></div>
 <div class="center">
@@ -445,81 +454,62 @@ list.innerHTML+=`
 <div class="dot green" id="dot${i}"></div>
 </div>
 </div>`;
-}
+      }
 
-function renderAll(){
+      function renderAll() {
+        for (let i = 1; i <= 8; i++) {
+          const el = document.getElementById("t" + i);
+          const card = document.getElementById("card" + i);
+          const dot = document.getElementById("dot" + i);
+          const data = timersData[i];
+          if (!data) {
+            el.innerText = "READY";
+            dot.className = "dot green";
+            card.classList.remove("orangeWarn");
+            lastRemaining[i] = null;
+            continue;
+          }
+          const elapsed = (Date.now() - data.startTime) / 1000;
+          const remaining = data.duration - elapsed;
+          if (remaining > 0) {
+            const m = Math.floor(remaining / 60);
+            const s = Math.floor(remaining % 60);
+            el.innerText = `${m}:${String(s).padStart(2,"0")}`;
+            dot.className = "dot " + (remaining < 60 ? "orange" : "red");
+            if (remaining < 60) card.classList.add("orangeWarn");
+            else card.classList.remove("orangeWarn");
+          } else {
+            const over = Math.abs(remaining);
+            const m = Math.floor(over / 60);
+            const s = Math.floor(over % 60);
+            el.innerText = `+${m}:${String(s).padStart(2,"0")}`;
+            dot.className = "dot green";
+            card.classList.remove("orangeWarn");
+            if (lastRemaining[i] > 0) {
+              speak("C H " + i + " ready");
+            }
+          }
+          lastRemaining[i] = remaining;
+        }
+      }
+      /* ACTIONS */
+      function parseMinutes(v) {
+        return Math.floor(parseFloat(v.replace(",", ".")) * 60);
+      }
 
-for(let i=1;i<=8;i++){
+      function start(ch) {
+        db.ref(`rooms/${ROOM}/timers/${ch}`).set({
+          startTime: Date.now(),
+          duration: parseMinutes(document.getElementById("minutesInput").value)
+        });
+      }
 
-const el=document.getElementById("t"+i);
-const card=document.getElementById("card"+i);
-const dot=document.getElementById("dot"+i);
+      function resetTimer(ch) {
+        db.ref(`rooms/${ROOM}/timers/${ch}`).remove();
+      }
+      updateUI();
+    </script>
 
-const data=timersData[i];
+  </body>
 
-if(!data){
-el.innerText="READY";
-dot.className="dot green";
-card.classList.remove("orangeWarn");
-lastRemaining[i]=null;
-continue;
-}
-
-const elapsed=(Date.now()-data.startTime)/1000;
-const remaining=data.duration-elapsed;
-
-if(remaining>0){
-
-const m=Math.floor(remaining/60);
-const s=Math.floor(remaining%60);
-
-el.innerText=`${m}:${String(s).padStart(2,"0")}`;
-
-dot.className="dot "+(remaining<60?"orange":"red");
-
-if(remaining<60) card.classList.add("orangeWarn");
-else card.classList.remove("orangeWarn");
-
-}else{
-
-const over=Math.abs(remaining);
-const m=Math.floor(over/60);
-const s=Math.floor(over%60);
-
-el.innerText=`+${m}:${String(s).padStart(2,"0")}`;
-
-dot.className="dot green";
-card.classList.remove("orangeWarn");
-
-if(lastRemaining[i] > 0){
-speak("C H " + i + " ready");
-}
-
-}
-
-lastRemaining[i]=remaining;
-
-}
-
-}
-
-/* ACTIONS */
-function parseMinutes(v){
-return Math.floor(parseFloat(v.replace(",", "."))*60);
-}
-
-function start(ch){
-db.ref(`rooms/${ROOM}/timers/${ch}`).set({
-startTime:Date.now(),
-duration:parseMinutes(document.getElementById("minutesInput").value)
-});
-}
-
-function resetTimer(ch){
-db.ref(`rooms/${ROOM}/timers/${ch}`).remove();
-}
-
-</script>
-
-</body>
 </html>
