@@ -191,8 +191,8 @@
         display: none;
         z-index: 9999;
       }
-	  
-	  #roomListWrapper {
+
+      #roomListWrapper {
         display: flex;
         justify-content: center;
         margin-top: 20px;
@@ -299,7 +299,7 @@
         measurementId: "G-85TB0NSB8X"
       };
       firebase.initializeApp(firebaseConfig);
-            firebase.auth().signInAnonymously().then(() => {
+      firebase.auth().signInAnonymously().then(() => {
         loadRooms();
         updateUI();
       });
@@ -313,7 +313,7 @@
         document.getElementById("roomActions").classList.toggle("hidden", inRoom);
         document.getElementById("usernameBox").classList.toggle("hidden", inRoom);
         document.getElementById("leaveBox").classList.toggle("hidden", !inRoom);
-		document.getElementById("roomListWrapper").style.display =
+        document.getElementById("roomListWrapper").style.display =
           inRoom ? "none" : "flex";
       }
       /* SPEAK (UNCHANGED) */
@@ -377,8 +377,8 @@
         }
         return u;
       }
-	  
-	        function loadRooms() {
+
+      function loadRooms() {
         db.ref("rooms").on("value", snap => {
           const rooms = snap.val() || {};
           const keys = Object.keys(rooms);
@@ -421,7 +421,6 @@ border-radius:8px;
         setRoom(room);
         showMessage("Connected: " + room);
       }
-	  
       /* JOIN / CREATE */
       function joinRoom() {
         const room = document.getElementById("roomInput").value.trim();
@@ -560,6 +559,9 @@ ${d.toLocaleDateString("de-DE")} ${d.toLocaleTimeString("de-DE",{hour:"2-digit",
             card.classList.remove("orangeWarn");
             if (lastRemaining[i] > 0) {
               speak("C H " + i + " ready");
+			  if(navigator.vibrate){
+			navigator.vibrate([300,100,300]);
+			}
             }
           }
           lastRemaining[i] = remaining;
