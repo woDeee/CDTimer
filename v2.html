@@ -191,6 +191,22 @@
         display: none;
         z-index: 9999;
       }
+	  
+	  #roomListWrapper {
+        display: flex;
+        justify-content: center;
+        margin-top: 20px;
+      }
+
+      #roomListBox {
+        background: #111;
+        border: 1px solid #333;
+        padding: 15px;
+        border-radius: 10px;
+        width: 320px;
+        max-height: 400px;
+        overflow: auto;
+      }
     </style>
   </head>
 
@@ -225,6 +241,13 @@
     </div>
 
     <div class="container">
+
+      <div id="roomListWrapper">
+        <div id="roomListBox">
+          <strong>Verfügbare Räume</strong>
+          <div id="roomList" style="margin-top:10px;"></div>
+        </div>
+      </div>
 
       <div class="settings" id="settings">
         <label>Minuten:</label>
@@ -276,7 +299,10 @@
         measurementId: "G-85TB0NSB8X"
       };
       firebase.initializeApp(firebaseConfig);
-      firebase.auth().signInAnonymously();
+            firebase.auth().signInAnonymously().then(() => {
+        loadRooms();
+        updateUI();
+      });
       const db = firebase.database();
       let ROOM = null;
       let timersData = {};
@@ -287,6 +313,8 @@
         document.getElementById("roomActions").classList.toggle("hidden", inRoom);
         document.getElementById("usernameBox").classList.toggle("hidden", inRoom);
         document.getElementById("leaveBox").classList.toggle("hidden", !inRoom);
+		document.getElementById("roomListWrapper").style.display =
+          inRoom ? "none" : "flex";
       }
       /* SPEAK (UNCHANGED) */
       function speak(text) {
@@ -349,6 +377,51 @@
         }
         return u;
       }
+	  
+	        function loadRooms() {
+        db.ref("rooms").on("value", snap => {
+          const rooms = snap.val() || {};
+          const keys = Object.keys(rooms);
+          const list = document.getElementById("roomList");
+          if (!keys.length) {
+            list.innerHTML = "<div style='color:#777'>Keine Räume</div>";
+            return;
+          }
+          list.innerHTML = keys.map(room => {
+            const users = rooms[room]?.users || {};
+            const count = Object.keys(users).length;
+            return `
+<div style="
+display:flex;
+justify-content:space-between;
+align-items:center;
+padding:10px;
+margin-bottom:8px;
+background:#1a1a1a;
+border:1px solid #333;
+border-radius:8px;
+">
+
+<div>
+<strong>${room}</strong>
+<div style="font-size:12px;color:#aaa">👥 ${count} User</div>
+</div>
+
+<button onclick="quickJoin('${room}')">Join</button>
+
+</div>
+`;
+          }).join("");
+        });
+      }
+
+      function quickJoin(room) {
+        const u = requireUsername();
+        if (!u) return;
+        setRoom(room);
+        showMessage("Connected: " + room);
+      }
+	  
       /* JOIN / CREATE */
       function joinRoom() {
         const room = document.getElementById("roomInput").value.trim();
