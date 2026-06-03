@@ -103,6 +103,21 @@ input,button{
     padding:8px;
 }
 
+/* CHAT INPUT ROW FIX */
+.chatInputRow{
+    display:flex;
+    gap:5px;
+    margin-top:6px;
+}
+
+.chatInputRow input{
+    flex:1;
+}
+
+.chatInputRow button{
+    width:90px;
+}
+
 /* TIMER CARD */
 .hud-card{
     background:rgba(255,255,255,0.04);
@@ -197,7 +212,7 @@ Mute
 <div id="chatBox"></div>
 
 <div class="chatInputRow">
-<input id="chatInput" placeholder="Message" style="flex:1;">
+<input id="chatInput" placeholder="Message">
 <button onclick="sendChat()">Send</button>
 </div>
 
@@ -232,7 +247,7 @@ let ROOM=null;
 let timersData={};
 let lastRemaining={};
 
-/* ================= SPEAK (RESTORED) ================= */
+/* SPEAK (UNCHANGED) */
 function speak(text){
 
 if(document.getElementById("muteVoice").checked) return;
@@ -259,7 +274,6 @@ speechSynthesis.speak(msg);
 
 }
 
-/* optional unlock */
 document.body.addEventListener("click", () => {
 speechSynthesis.getVoices();
 }, { once:true });
@@ -298,7 +312,7 @@ return null;
 return u;
 }
 
-/* JOIN */
+/* JOIN / CREATE (UNCHANGED) */
 function joinRoom(){
 const room=document.getElementById("roomInput").value.trim();
 if(!room) return showMessage("⚠ Room Name fehlt");
@@ -317,7 +331,6 @@ showMessage("🔵 Verbunden mit Channel");
 });
 }
 
-/* CREATE */
 function createRoom(){
 const room=document.getElementById("roomInput").value.trim();
 if(!room) return showMessage("⚠ Room Name fehlt");
@@ -359,9 +372,10 @@ Object.values(data).map(u=>`<div>🟩 ${u}</div>`).join("");
 });
 }
 
-/* CHAT */
+/* CHAT SEND (FIX: CLEAR INPUT) */
 function sendChat(){
-const text=document.getElementById("chatInput").value.trim();
+const input=document.getElementById("chatInput");
+const text=input.value.trim();
 if(!text) return;
 
 db.ref(`rooms/${ROOM}/chat`).push({
@@ -369,8 +383,12 @@ user:document.getElementById("username").value.trim() || "User",
 text,
 timestamp:Date.now()
 });
+
+/* 🔥 CLEAR INPUT AFTER SEND */
+input.value="";
 }
 
+/* CHAT LIST (FIX: DATE BEFORE TIME) */
 function listenChat(){
 db.ref(`rooms/${ROOM}/chat`)
 .limitToLast(10)
@@ -384,10 +402,13 @@ const msgs=Object.values(data).sort((a,b)=>a.timestamp-b.timestamp);
 box.innerHTML=msgs.map(m=>{
 const d=new Date(m.timestamp);
 
+const date = d.toLocaleDateString("de-DE");
+const time = d.toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"});
+
 return `
 <div style="border-bottom:1px solid #222;margin-bottom:6px;padding-bottom:6px;">
 <div style="font-size:11px;color:#888">
-${d.toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"})}
+${date} ${time}
 • <span style="color:#00ff88">${m.user}</span>
 </div>
 <div>${m.text}</div>
@@ -399,7 +420,7 @@ box.scrollTop=box.scrollHeight;
 });
 }
 
-/* TIMER */
+/* TIMER (UNCHANGED) */
 function listenRoom(){
 db.ref(`rooms/${ROOM}/timers`).on("value",snap=>{
 timersData=snap.val()||{};
@@ -470,9 +491,8 @@ el.innerText=`+${m}:${String(s).padStart(2,"0")}`;
 dot.className="dot green";
 card.classList.remove("orangeWarn");
 
-/* 🔊 SOUND TRIGGER */
 if(lastRemaining[i] > 0){
-speak("Channel " + i + " ready");
+speak("C H " + i + " ready");
 }
 
 }
