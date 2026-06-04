@@ -307,6 +307,10 @@
       let ROOM = null;
       let timersData = {};
       let lastRemaining = {};
+
+      let roomRef = null;
+      let chatRef = null;
+      let usersRef = null;
       /* UI STATE CONTROL (NEW) */
       function updateUI() {
         const inRoom = !!ROOM;
@@ -359,13 +363,29 @@
         if (ROOM) {
           db.ref(`rooms/${ROOM}/users/${firebase.auth().currentUser.uid}`).remove();
         }
+
+        if (roomRef) roomRef.off();
+        if (chatRef) chatRef.off();
+        if (usersRef) usersRef.off();
+
+        roomRef = null;
+        chatRef = null;
+        usersRef = null;
+
+        speechSynthesis.cancel();
+
         ROOM = null;
         timersData = {};
         lastRemaining = {};
+
         document.getElementById("roomLabel").innerText = "NO ROOM";
         document.getElementById("list").classList.add("hidden");
         document.getElementById("settings").classList.remove("active");
         document.getElementById("usersBox").classList.remove("active");
+
+        document.getElementById("userList").innerHTML = "";
+        document.getElementById("chatBox").innerHTML = "";
+
         updateUI();
       }
       /* VALIDATION */
@@ -464,11 +484,20 @@ border-radius:8px;
       }
 
       function listenUsers() {
-        db.ref(`rooms/${ROOM}/users`).on("value", snap => {
+
+        if (usersRef) usersRef.off();
+
+        usersRef = db.ref(`rooms/${ROOM}/users`);
+
+        usersRef.on("value", snap => {
+
           const data = snap.val() || {};
+
           document.getElementById("userList").innerHTML =
             Object.values(data).map(u => `<div>🟩 ${u}</div>`).join("");
+
         });
+
       }
       /* CHAT */
       function sendChat() {
@@ -484,14 +513,25 @@ border-radius:8px;
       }
       /* CHAT LIST */
       function listenChat() {
-        db.ref(`rooms/${ROOM}/chat`)
+
+        if (chatRef) chatRef.off();
+
+        chatRef = db.ref(`rooms/${ROOM}/chat`);
+
+        chatRef
           .limitToLast(10)
           .on("value", snap => {
+
             const data = snap.val() || {};
             const box = document.getElementById("chatBox");
-            const msgs = Object.values(data).sort((a, b) => a.timestamp - b.timestamp);
+
+            const msgs = Object.values(data)
+              .sort((a, b) => a.timestamp - b.timestamp);
+
             box.innerHTML = msgs.map(m => {
+
               const d = new Date(m.timestamp);
+
               return `
 <div style="border-bottom:1px solid #222;margin-bottom:6px;padding-bottom:6px;">
 <div style="font-size:11px;color:#888">
@@ -500,16 +540,29 @@ ${d.toLocaleDateString("de-DE")} ${d.toLocaleTimeString("de-DE",{hour:"2-digit",
 </div>
 <div>${m.text}</div>
 </div>`;
+
             }).join("");
+
             box.scrollTop = box.scrollHeight;
+
           });
+
       }
       /* TIMER */
       function listenRoom() {
-        db.ref(`rooms/${ROOM}/timers`).on("value", snap => {
+
+        if (roomRef) roomRef.off();
+
+        roomRef = db.ref(`rooms/${ROOM}/timers`);
+
+        roomRef.on("value", snap => {
+
           timersData = snap.val() || {};
+
           renderAll();
+
         });
+
       }
       setInterval(renderAll, 1000);
       const list = document.getElementById("list");
