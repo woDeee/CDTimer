@@ -52,7 +52,6 @@
         gap: 30px;
       }
 
-      /* SETTINGS */
       .settings {
         display: none;
         justify-content: center;
@@ -83,7 +82,6 @@
         display: flex;
       }
 
-      /* FIXED SCROLL AREAS */
       #userList {
         flex: 1;
         overflow-y: auto;
@@ -109,7 +107,6 @@
         padding: 8px;
       }
 
-      /* CHAT INPUT ROW FIX */
       .chatInputRow {
         display: flex;
         gap: 5px;
@@ -124,7 +121,6 @@
         width: 90px;
       }
 
-      /* TIMER CARD */
       .hud-card {
         background: rgba(255, 255, 255, 0.04);
         border: 1px solid rgba(255, 255, 255, 0.1);
@@ -171,13 +167,23 @@
         animation: blink .6s infinite;
       }
 
+      .greenWarn {
+        border: 2px solid #00ff88 !important;
+        animation: greenBlink .6s infinite;
+      }
+
       @keyframes blink {
         50% {
           opacity: .4
         }
       }
 
-      /* TOAST */
+      @keyframes greenBlink {
+        50% {
+          opacity: .4
+        }
+      }
+
       #toast {
         position: fixed;
         bottom: 30px;
@@ -219,19 +225,16 @@
         <span id="roomLabel">NO ROOM</span>
       </div>
 
-      <!-- USERNAME -->
       <div id="usernameBox">
         <input id="username" placeholder="Username">
       </div>
 
-      <!-- ROOM ACTIONS -->
       <div id="roomActions">
         <input id="roomInput" placeholder="Room">
         <button onclick="joinRoom()">Join</button>
         <button onclick="createRoom()">Create</button>
       </div>
 
-      <!-- LEAVE -->
       <div id="leaveBox" class="hidden">
         <button onclick="leaveRoom()" style="background:#ff4040;border-color:#ff4040;">
           Leave Channel
@@ -307,11 +310,10 @@
       let ROOM = null;
       let timersData = {};
       let lastRemaining = {};
-
       let roomRef = null;
       let chatRef = null;
       let usersRef = null;
-      /* UI STATE CONTROL (NEW) */
+
       function updateUI() {
         const inRoom = !!ROOM;
         document.getElementById("roomActions").classList.toggle("hidden", inRoom);
@@ -320,7 +322,7 @@
         document.getElementById("roomListWrapper").style.display =
           inRoom ? "none" : "flex";
       }
-      /* SPEAK (UNCHANGED) */
+
       function speak(text) {
         if (document.getElementById("muteVoice").checked) return;
         if (speechSynthesis.speaking) {
@@ -333,19 +335,20 @@
           msg.volume = 1;
           const voices = speechSynthesis.getVoices();
           if (voices.length) {
-            msg.voice = voices.find(v => v.lang.includes("de")) || voices[0];
+            msg.voice =
+              voices.find(v => v.lang.includes("de")) || voices[0];
           }
           speechSynthesis.speak(msg);
         }, 50);
       }
-      /* TOAST */
+
       function showMessage(msg) {
         const t = document.getElementById("toast");
         t.innerText = msg;
         t.style.display = "block";
         setTimeout(() => t.style.display = "none", 2500);
       }
-      /* SET ROOM */
+
       function setRoom(r) {
         ROOM = r;
         document.getElementById("roomLabel").innerText = r;
@@ -358,37 +361,30 @@
         listenUsers();
         registerUser();
       }
-      /* LEAVE */
+
       function leaveRoom() {
         if (ROOM) {
           db.ref(`rooms/${ROOM}/users/${firebase.auth().currentUser.uid}`).remove();
         }
-
         if (roomRef) roomRef.off();
         if (chatRef) chatRef.off();
         if (usersRef) usersRef.off();
-
         roomRef = null;
         chatRef = null;
         usersRef = null;
-
         speechSynthesis.cancel();
-
         ROOM = null;
         timersData = {};
         lastRemaining = {};
-
         document.getElementById("roomLabel").innerText = "NO ROOM";
         document.getElementById("list").classList.add("hidden");
         document.getElementById("settings").classList.remove("active");
         document.getElementById("usersBox").classList.remove("active");
-
         document.getElementById("userList").innerHTML = "";
         document.getElementById("chatBox").innerHTML = "";
-
         updateUI();
       }
-      /* VALIDATION */
+
       function requireUsername() {
         const u = document.getElementById("username").value.trim();
         if (!u) {
@@ -411,26 +407,13 @@
             const users = rooms[room]?.users || {};
             const count = Object.keys(users).length;
             return `
-<div style="
-display:flex;
-justify-content:space-between;
-align-items:center;
-padding:10px;
-margin-bottom:8px;
-background:#1a1a1a;
-border:1px solid #333;
-border-radius:8px;
-">
-
+<div style="display:flex;justify-content:space-between;align-items:center;padding:10px;margin-bottom:8px;background:#1a1a1a;border:1px solid #333;border-radius:8px;">
 <div>
 <strong>${room}</strong>
 <div style="font-size:12px;color:#aaa">👥 ${count} User</div>
 </div>
-
 <button onclick="quickJoin('${room}')">Join</button>
-
-</div>
-`;
+</div>`;
           }).join("");
         });
       }
@@ -441,7 +424,7 @@ border-radius:8px;
         setRoom(room);
         showMessage("Connected: " + room);
       }
-      /* JOIN / CREATE */
+
       function joinRoom() {
         const room = document.getElementById("roomInput").value.trim();
         if (!room) return showMessage("⚠ Room Name fehlt");
@@ -475,31 +458,25 @@ border-radius:8px;
           showMessage("✅ Channel erstellt");
         });
       }
-      /* USERS */
+
       function registerUser() {
         const uid = firebase.auth().currentUser.uid;
-        const name = document.getElementById("username").value.trim() || "User";
+        const name =
+          document.getElementById("username").value.trim() || "User";
         db.ref(`rooms/${ROOM}/users/${uid}`).set(name);
         db.ref(`rooms/${ROOM}/users/${uid}`).onDisconnect().remove();
       }
 
       function listenUsers() {
-
         if (usersRef) usersRef.off();
-
         usersRef = db.ref(`rooms/${ROOM}/users`);
-
         usersRef.on("value", snap => {
-
           const data = snap.val() || {};
-
           document.getElementById("userList").innerHTML =
             Object.values(data).map(u => `<div>🟩 ${u}</div>`).join("");
-
         });
-
       }
-      /* CHAT */
+
       function sendChat() {
         const input = document.getElementById("chatInput");
         const text = input.value.trim();
@@ -511,58 +488,39 @@ border-radius:8px;
         });
         input.value = "";
       }
-      /* CHAT LIST */
+
       function listenChat() {
-
         if (chatRef) chatRef.off();
-
         chatRef = db.ref(`rooms/${ROOM}/chat`);
-
-        chatRef
-          .limitToLast(10)
-          .on("value", snap => {
-
-            const data = snap.val() || {};
-            const box = document.getElementById("chatBox");
-
-            const msgs = Object.values(data)
-              .sort((a, b) => a.timestamp - b.timestamp);
-
-            box.innerHTML = msgs.map(m => {
-
-              const d = new Date(m.timestamp);
-
-              return `
+        chatRef.limitToLast(10).on("value", snap => {
+          const data = snap.val() || {};
+          const box = document.getElementById("chatBox");
+          const msgs = Object.values(data).sort(
+            (a, b) => a.timestamp - b.timestamp
+          );
+          box.innerHTML = msgs.map(m => {
+            const d = new Date(m.timestamp);
+            return `
 <div style="border-bottom:1px solid #222;margin-bottom:6px;padding-bottom:6px;">
 <div style="font-size:11px;color:#888">
-${d.toLocaleDateString("de-DE")} ${d.toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"})}
+${d.toLocaleDateString("de-DE")}
+${d.toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"})}
 • <span style="color:#00ff88">${m.user}</span>
 </div>
 <div>${m.text}</div>
 </div>`;
-
-            }).join("");
-
-            box.scrollTop = box.scrollHeight;
-
-          });
-
-      }
-      /* TIMER */
-      function listenRoom() {
-
-        if (roomRef) roomRef.off();
-
-        roomRef = db.ref(`rooms/${ROOM}/timers`);
-
-        roomRef.on("value", snap => {
-
-          timersData = snap.val() || {};
-
-          renderAll();
-
+          }).join("");
+          box.scrollTop = box.scrollHeight;
         });
+      }
 
+      function listenRoom() {
+        if (roomRef) roomRef.off();
+        roomRef = db.ref(`rooms/${ROOM}/timers`);
+        roomRef.on("value", snap => {
+          timersData = snap.val() || {};
+          renderAll();
+        });
       }
       setInterval(renderAll, 1000);
       const list = document.getElementById("list");
@@ -570,10 +528,12 @@ ${d.toLocaleDateString("de-DE")} ${d.toLocaleTimeString("de-DE",{hour:"2-digit",
         list.innerHTML += `
 <div class="hud-card" id="card${i}">
 <div><strong>CH${i}</strong></div>
+
 <div class="center">
 <button onclick="start(${i})">Start</button>
 <button onclick="resetTimer(${i})">Reset</button>
 </div>
+
 <div class="right">
 <span id="t${i}">READY</span>
 <div class="dot green" id="dot${i}"></div>
@@ -591,6 +551,7 @@ ${d.toLocaleDateString("de-DE")} ${d.toLocaleTimeString("de-DE",{hour:"2-digit",
             el.innerText = "READY";
             dot.className = "dot green";
             card.classList.remove("orangeWarn");
+            card.classList.remove("greenWarn");
             lastRemaining[i] = null;
             continue;
           }
@@ -601,8 +562,12 @@ ${d.toLocaleDateString("de-DE")} ${d.toLocaleTimeString("de-DE",{hour:"2-digit",
             const s = Math.floor(remaining % 60);
             el.innerText = `${m}:${String(s).padStart(2,"0")}`;
             dot.className = "dot " + (remaining < 60 ? "orange" : "red");
-            if (remaining < 60) card.classList.add("orangeWarn");
-            else card.classList.remove("orangeWarn");
+            card.classList.remove("greenWarn");
+            if (remaining < 60) {
+              card.classList.add("orangeWarn");
+            } else {
+              card.classList.remove("orangeWarn");
+            }
           } else {
             const over = Math.abs(remaining);
             const m = Math.floor(over / 60);
@@ -610,17 +575,18 @@ ${d.toLocaleDateString("de-DE")} ${d.toLocaleTimeString("de-DE",{hour:"2-digit",
             el.innerText = `+${m}:${String(s).padStart(2,"0")}`;
             dot.className = "dot green";
             card.classList.remove("orangeWarn");
+            card.classList.add("greenWarn");
             if (lastRemaining[i] > 0) {
               speak("C H " + i + " ready");
-			  if(navigator.vibrate){
-			navigator.vibrate([300,100,300]);
-			}
+              if (navigator.vibrate) {
+                navigator.vibrate([300, 100, 300]);
+              }
             }
           }
           lastRemaining[i] = remaining;
         }
       }
-      /* ACTIONS */
+
       function parseMinutes(v) {
         return Math.floor(parseFloat(v.replace(",", ".")) * 60);
       }
@@ -628,7 +594,9 @@ ${d.toLocaleDateString("de-DE")} ${d.toLocaleTimeString("de-DE",{hour:"2-digit",
       function start(ch) {
         db.ref(`rooms/${ROOM}/timers/${ch}`).set({
           startTime: Date.now(),
-          duration: parseMinutes(document.getElementById("minutesInput").value)
+          duration: parseMinutes(
+            document.getElementById("minutesInput").value
+          )
         });
       }
 
