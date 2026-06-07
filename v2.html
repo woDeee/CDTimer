@@ -379,7 +379,7 @@
             <div id="chatBox"></div>
 
             <div class="chatInputRow">
-              <input id="chatInput" placeholder="Nachricht...">
+              <input id="chatInput" placeholder="Nachricht..." onkeydown="if(event.key === 'Enter') sendChat()">
               <button onclick="sendChat()" style="background: #00ff88; color: #000; border-color: #00ff88;">Send</button>
             </div>
           </div>
@@ -418,6 +418,7 @@
       let chatRef = null;
       let usersRef = null;
 
+      // DEINE AKTUALISIERTEN FESTEN RÄUME
       const FIXED_ROOMS = [
         "Orctal Schatten 1",
         "Orctal Schatten 2",
@@ -683,6 +684,7 @@
         });
         
         input.value = "";
+        input.focus(); // Setzt den Cursor sofort wieder in das Textfeld
 
         chatRef.once("value", snap => {
           if (snap.exists()) {
