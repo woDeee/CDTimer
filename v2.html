@@ -301,11 +301,14 @@
         appId: "1:76292108896:web:6030d1d5c7ccfea7d44905",
         measurementId: "G-85TB0NSB8X"
       };
+      
       firebase.initializeApp(firebaseConfig);
       firebase.auth().signInAnonymously().then(() => {
+        initFixedRooms(); // Initiiert die festen Räume in der DB
         loadRooms();
         updateUI();
       });
+      
       const db = firebase.database();
       let ROOM = null;
       let timersData = {};
@@ -313,6 +316,21 @@
       let roomRef = null;
       let chatRef = null;
       let usersRef = null;
+
+      // DEINE FESTEN RÄUME (Hier kannst du Namen ändern/hinzufügen)
+      const FIXED_ROOMS = [
+        "Orctal Schatten 1",
+        "Orctal Schatten 2",
+        "Orctal Seele 1",
+        "Orctal Seele 2"
+      ];
+
+      // Sorgt dafür, dass feste Räume in FB existieren und niemals automatisch gelöscht werden
+      function initFixedRooms() {
+        FIXED_ROOMS.forEach(room => {
+          db.ref(`rooms/${room}/isFixed`).set(true);
+        });
+      }
 
       function updateUI() {
         const inRoom = !!ROOM;
@@ -364,8 +382,32 @@
 
       function leaveRoom() {
         if (ROOM) {
-          db.ref(`rooms/${ROOM}/users/${firebase.auth().currentUser.uid}`).remove();
+          const myUid = firebase.auth().currentUser.uid;
+          
+          // Wenn es ein temporärer Raum ist, prüfen wir vor dem Gehen, ob wir alleine sind
+          if (!FIXED_ROOMS.includes(ROOM)) {
+            db.ref(`rooms/${ROOM}/users`).once("value", snap => {
+              const users = snap.val() || {};
+              const uids = Object.keys(users);
+              
+              // Wenn wir der einzige verbleibende User sind, löschen wir den kompletten Raum-Knoten
+              if (uids.length <= 1 && uids.includes(myUid)) {
+                db.ref(`rooms/${ROOM}`).remove();
+              } else {
+                // Es sind noch andere da? Dann löschen wir nur uns selbst
+                db.ref(`rooms/${ROOM}/users/${myUid}`).remove();
+              }
+            });
+          } else {
+            // Bei festen Räumen löschen wir immer nur uns selbst, damit Chat/Timer bleiben
+            db.ref(`rooms/${ROOM}/users/${myUid}`).remove();
+          }
+
+          // OnDisconnect-Registrierungen für diesen Raum sauber aufheben
+          db.ref(`rooms/${ROOM}/users/${myUid}`).onDisconnect().cancel();
+          db.ref(`rooms/${ROOM}`).onDisconnect().cancel();
         }
+
         if (roomRef) roomRef.off();
         if (chatRef) chatRef.off();
         if (usersRef) usersRef.off();
@@ -396,26 +438,45 @@
 
       function loadRooms() {
         db.ref("rooms").on("value", snap => {
-          const rooms = snap.val() || {};
-          const keys = Object.keys(rooms);
+          const fbRooms = snap.val() || {};
           const list = document.getElementById("roomList");
-          if (!keys.length) {
-            list.innerHTML = "<div style='color:#777'>Keine Räume</div>";
-            return;
-          }
-          list.innerHTML = keys.map(room => {
-            const users = rooms[room]?.users || {};
+          
+          const activeRoomNames = Object.keys(fbRooms);
+          
+          // 1. Feste Räume rendern
+          let roomsHTML = FIXED_ROOMS.map(room => {
+            const users = fbRooms[room]?.users || {};
             const count = Object.keys(users).length;
-            return `
+            return createRoomRowHTML(room, count, true);
+          });
+
+          // 2. Temporäre Räume rendern
+          activeRoomNames.forEach(room => {
+            if (!FIXED_ROOMS.includes(room)) {
+              const users = fbRooms[room]?.users || {};
+              const count = Object.keys(users).length;
+              // Temporäre Räume nur listen, wenn auch aktive User drin sind
+              if (count > 0) {
+                roomsHTML.push(createRoomRowHTML(room, count, false));
+              }
+            }
+          });
+
+          list.innerHTML = roomsHTML.join("");
+        });
+      }
+
+      function createRoomRowHTML(name, userCount, isFixed) {
+        const icon = isFixed ? "⭐" : "🕒";
+        const label = isFixed ? "Fester Raum" : "Temporär";
+        return `
 <div style="display:flex;justify-content:space-between;align-items:center;padding:10px;margin-bottom:8px;background:#1a1a1a;border:1px solid #333;border-radius:8px;">
 <div>
-<strong>${room}</strong>
-<div style="font-size:12px;color:#aaa">👥 ${count} User</div>
+<strong>${icon} ${name}</strong>
+<div style="font-size:12px;color:#aaa">👥 ${userCount} User • <span style="color:#777">${label}</span></div>
 </div>
-<button onclick="quickJoin('${room}')">Join</button>
+<button onclick="quickJoin('${name}')">Join</button>
 </div>`;
-          }).join("");
-        });
       }
 
       function quickJoin(room) {
@@ -430,14 +491,21 @@
         if (!room) return showMessage("⚠ Room Name fehlt");
         const user = requireUsername();
         if (!user) return;
-        db.ref(`rooms/${room}`).once("value", snap => {
-          if (!snap.exists()) {
-            showMessage("❌ Channel existiert nicht");
-            return;
-          }
+        
+        if (FIXED_ROOMS.includes(room)) {
           setRoom(room);
           showMessage("🔵 Verbunden mit Channel");
-        });
+        } else {
+          db.ref(`rooms/${room}`).once("value", snap => {
+            const hasUsers = snap.child("users").exists();
+            if (!snap.exists() || !hasUsers) {
+              showMessage("❌ Channel existiert nicht oder ist inaktiv");
+              return;
+            }
+            setRoom(room);
+            showMessage("🔵 Verbunden mit Channel");
+          });
+        }
       }
 
       function createRoom() {
@@ -445,26 +513,51 @@
         if (!room) return showMessage("⚠ Room Name fehlt");
         const user = requireUsername();
         if (!user) return;
+        
+        if (FIXED_ROOMS.includes(room)) {
+          setRoom(room);
+          showMessage("⚠ Das ist ein fester Channel – verbunden");
+          return;
+        }
+
         db.ref(`rooms/${room}`).once("value", snap => {
-          if (snap.exists()) {
+          const hasUsers = snap.child("users").exists();
+          if (snap.exists() && hasUsers) {
             setRoom(room);
             showMessage("⚠ Channel existiert bereits – verbunden");
             return;
           }
-          db.ref(`rooms/${room}`).set({
-            createdAt: Date.now()
-          });
+          
           setRoom(room);
-          showMessage("✅ Channel erstellt");
+          showMessage("✅ Temporärer Channel erstellt");
         });
       }
 
       function registerUser() {
         const uid = firebase.auth().currentUser.uid;
-        const name =
-          document.getElementById("username").value.trim() || "User";
-        db.ref(`rooms/${ROOM}/users/${uid}`).set(name);
-        db.ref(`rooms/${ROOM}/users/${uid}`).onDisconnect().remove();
+        const name = document.getElementById("username").value.trim() || "User";
+        
+        const myUserRef = db.ref(`rooms/${ROOM}/users/${uid}`);
+        myUserRef.set(name);
+        
+        // Verhalten für den Fall, dass das Tab einfach geschlossen wird:
+        if (!FIXED_ROOMS.includes(ROOM)) {
+          db.ref(`rooms/${ROOM}/users`).once("value", snap => {
+            const users = snap.val() || {};
+            
+            if (Object.keys(users).length <= 1) {
+              // Wir sind alleine im Raum: Beim Disconnect fliegt alles weg
+              db.ref(`rooms/${ROOM}`).onDisconnect().remove();
+            } else {
+              // Andere sind da: Beim Disconnect nur uns selbst löschen
+              myUserRef.onDisconnect().remove();
+              db.ref(`rooms/${ROOM}`).onDisconnect().cancel();
+            }
+          });
+        } else {
+          // Fester Raum: Beim Disconnect NIEMALS den ganzen Raum löschen
+          myUserRef.onDisconnect().remove();
+        }
       }
 
       function listenUsers() {
@@ -477,16 +570,43 @@
         });
       }
 
-      function sendChat() {
+function sendChat() {
         const input = document.getElementById("chatInput");
         const text = input.value.trim();
         if (!text) return;
-        db.ref(`rooms/${ROOM}/chat`).push({
+        
+        const chatRef = db.ref(`rooms/${ROOM}/chat`);
+        
+        // 1. Neue Nachricht pushen
+        chatRef.push({
           user: document.getElementById("username").value.trim() || "User",
           text,
           timestamp: Date.now()
         });
+        
         input.value = "";
+
+        // 2. Prüfen und aufräumen: Nur die neuesten 10 Nachrichten behalten
+        chatRef.once("value", snap => {
+          if (snap.exists()) {
+            const data = snap.val();
+            const keys = Object.keys(data);
+            
+            // Wenn mehr als 10 Nachrichten existieren, müssen die ältesten weg
+            if (keys.length > 10) {
+              // Sortiert die Keys anhand des Timestamps der Nachrichten aufsteigend (älteste zuerst)
+              const sortedKeys = keys.sort((a, b) => data[a].timestamp - data[b].timestamp);
+              
+              // Bestimmen, wie viele Nachrichten zu viel sind
+              const eitraegeZumLoeschen = sortedKeys.length - 10;
+              
+              // Die ältesten Einträge aus Firebase löschen
+              for (let i = 0; i < eitraegeZumLoeschen; i++) {
+                chatRef.child(sortedKeys[i]).remove();
+              }
+            }
+          }
+        });
       }
 
       function listenChat() {
@@ -522,7 +642,9 @@ ${d.toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"})}
           renderAll();
         });
       }
+      
       setInterval(renderAll, 1000);
+      
       const list = document.getElementById("list");
       for (let i = 1; i <= 8; i++) {
         list.innerHTML += `
@@ -603,6 +725,7 @@ ${d.toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"})}
       function resetTimer(ch) {
         db.ref(`rooms/${ROOM}/timers/${ch}`).remove();
       }
+      
       updateUI();
     </script>
 
