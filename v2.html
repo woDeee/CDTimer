@@ -35,6 +35,8 @@
         --color-green: #38a169;
         --color-red: #e53e3e;
         --color-orange: #dd6b20;
+        --card-glow: none;
+        --progress-bg: #edf2f7;
       }
 
       [data-theme="dark"] {
@@ -53,12 +55,14 @@
         --button-bg: #1a1a1a;
         --button-hover: #252525;
         --primary-color: #00ff88;
-        --orange-warn-bg: rgba(255, 159, 26, 0.05);
-        --green-warn-bg: rgba(0, 255, 136, 0.05);
+        --orange-warn-bg: rgba(255, 159, 26, 0.03);
+        --green-warn-bg: rgba(0, 255, 136, 0.03);
 
         --color-green: #00ff88;
         --color-red: #ff4040;
         --color-orange: #ff9f1a;
+        --card-glow: 0 0 15px rgba(255, 159, 26, 0.25);
+        --progress-bg: #1a1a1a;
       }
 
       body {
@@ -68,7 +72,7 @@
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
         padding-bottom: 20px;
         transition: background 0.3s, color 0.3s;
-        overflow-x: hidden; /* Verhindert Scrollbalken während der Slides */
+        overflow-x: hidden;
       }
 
       /* SCROLLBALKEN ANPASSUNG */
@@ -94,14 +98,6 @@
       .sidebar-content::-webkit-scrollbar-thumb {
         background: var(--scrollbar-thumb);
         border-radius: 10px;
-        transition: background 0.2s;
-      }
-
-      #userList::-webkit-scrollbar-thumb:hover,
-      #chatBox::-webkit-scrollbar-thumb:hover,
-      #roomListBox::-webkit-scrollbar-thumb:hover,
-      .sidebar-content::-webkit-scrollbar-thumb:hover {
-        background: var(--scrollbar-thumb-hover);
       }
 
       #userList, #chatBox, #roomListBox, .sidebar-content {
@@ -121,7 +117,6 @@
         box-shadow: 0 1px 3px rgba(0,0,0,0.02);
       }
 
-      /* Logo & Brand Layout */
       .topbar-brand {
         display: flex;
         align-items: center;
@@ -186,7 +181,7 @@
 
       .hidden { display: none !important; }
 
-      /* --- SLIDE ANIMATIONEN & LOBBY SYSTEM --- */
+      /* --- LOBBY SYSTEM SYSTEM --- */
       .lobby-wrapper {
         position: relative;
         width: 100%;
@@ -209,7 +204,6 @@
         transition: transform 0.5s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.5s ease;
       }
 
-      /* Zustand: Sichtbar im Fokus */
       .setup-box.active {
         transform: translateX(0);
         opacity: 1;
@@ -217,7 +211,6 @@
         pointer-events: auto;
       }
 
-      /* Zustand: Nach links rausgerutscht */
       .setup-box.exit-left {
         transform: translateX(-150%);
         opacity: 0;
@@ -225,7 +218,6 @@
         pointer-events: none;
       }
 
-      /* Zustand: Wartend auf der rechten Seite */
       .setup-box.ready-right {
         transform: translateX(150%);
         opacity: 0;
@@ -289,6 +281,7 @@
         box-sizing: border-box;
         height: 540px;
         box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+        transition: height 0.2s ease;
       }
 
       .usersPanel.active { display: flex; }
@@ -328,7 +321,7 @@
       .chatInputRow input { flex: 1; }
       .chatInputRow button { width: 80px; }
 
-      /* HUD Cards */
+      /* --- HUD CARDS & VISUELLE FEINSCHLIFFE --- */
       .hud-card {
         background: var(--card-bg);
         border: 1px solid var(--border-color);
@@ -341,7 +334,9 @@
         align-items: center;
         text-align: center;
         box-shadow: 0 2px 4px rgba(0,0,0,0.02);
-        transition: transform 0.15s ease, box-shadow 0.15s ease;
+        position: relative;
+        overflow: hidden; /* Wichtig für Progress Bar unten */
+        transition: transform 0.15s ease, box-shadow 0.3s ease, padding 0.2s ease;
       }
 
       .hud-card:hover {
@@ -363,9 +358,11 @@
       .red { background: var(--color-red); }
       .orange { background: var(--color-orange); }
 
+      /* Kritische Alarm-Modi */
       .orangeWarn {
         border: 2px solid var(--color-orange) !important;
         background: var(--orange-warn-bg) !important;
+        box-shadow: var(--card-glow);
         animation: blink .8s infinite;
       }
 
@@ -377,6 +374,34 @@
 
       @keyframes blink { 50% { border-color: transparent; } }
       @keyframes greenBlink { 50% { border-color: transparent; } }
+
+      /* Progress Bar Container & Line */
+      .progress-container {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        height: 4px;
+        background: var(--progress-bg);
+      }
+
+      .progress-bar {
+        height: 100%;
+        width: 0%;
+        background: var(--color-green);
+        transition: width 1s linear, background-color 0.3s ease;
+      }
+
+      /* --- COMPACT MODE LAYOUT OVERRIDES --- */
+      body.compact .container { max-width: 900px; }
+      body.compact .hud-card {
+        padding: 8px 14px;
+        margin-bottom: 6px;
+        border-radius: 8px;
+        font-size: 13px;
+      }
+      body.compact .hud-card button { padding: 6px 10px; font-size: 12px; border-radius: 6px; }
+      body.compact .usersPanel { height: 420px; }
 
       #toast {
         position: fixed;
@@ -417,7 +442,6 @@
         box-sizing: border-box;
       }
 
-      /* Runde Control Buttons */
       .control-btn {
         background: var(--button-bg);
         border: 1px solid var(--border-color);
@@ -518,12 +542,11 @@
         <div class="info-section">
           <h4>Bedienungsanleitung</h4>
           <ol class="guide-list">
-            <li>Trage deinen <strong>Spielernamen</strong> ein und bestätige.</li>
+            <li><strong>Namen auswählen</strong> Trage deinen Nickname ein. Dieser wird lokal im Browser gesichert. Bei zukünftigen Besuchen wird dieser Schritt automatisch übersprungen und du gelangst direkt in die Raumauswahl!</li>
             <li>Wähle einen Raum aus der Liste oder erstelle einen eigenen via Textfeld.</li>
-            <li>Sobald du verbunden bist, siehst du die Live-Timer für alle Channels (CH1 - CH8).</li>
-            <li>Stelle bei Bedarf oben die gewünschte <strong>Minutenanzahl</strong> ein.</li>
-            <li>Klicke auf <strong>Start</strong> bei dem jeweiligen CH, um den Cooldown für das Team zu aktivieren.</li>
-            <li>Über <strong>Reset</strong> löschst du den aktiven Timer wieder komplett.</li>
+            <li>Stelle oben die gewünschte <strong>Minutenanzahl</strong> ein.</li>
+            <li>Klicke auf <strong>Start</strong> bei dem jeweiligen CH, um den Cooldown zu aktivieren. Ein Fortschrittsbalken am unteren Kartenrand visualisiert die Restzeit.</li>
+            <li><strong>Compact Mode:</strong> Aktiviere den Modus in den Einstellungen, um Platz zu sparen, falls das HUD auf einem Nebenbildschirm läuft.</li>
           </ol>
         </div>
 
@@ -543,11 +566,11 @@
           </div>
           <div class="legend-item">
             <div class="legend-box-preview orangeWarn"></div>
-            <div><strong>Blinkender Oranger Rahmen</strong><br><span style="color: var(--topbar-subtext);">Visueller Alarm: Der Timer läuft gleich ab.</span></div>
+            <div><strong>Blinkender Oranger Rahmen + Glow</strong><br><span style="color: var(--topbar-subtext);">Visueller Alarm: Im Dunkelmodus pulsiert die Karte zusätzlich.</span></div>
           </div>
           <div class="legend-item">
             <div class="legend-box-preview greenWarn"></div>
-            <div><strong>Blinkender Grüner Rahmen (+ Zeit)</strong><br><span style="color: var(--topbar-subtext);">Der Cooldown ist abgelaufen! Die "+ Zeit" zeigt an, wie lange der CH schon offen steht.</span></div>
+            <div><strong>Blinkender Grüner Rahmen (+ Zeit)</strong><br><span style="color: var(--topbar-subtext);">Der Cooldown ist abgelaufen!</span></div>
           </div>
         </div>
       </div>
@@ -564,7 +587,7 @@
             <input id="username" placeholder="z.B. SuraGott" onkeydown="if(event.key === 'Enter') submitUsername()">
           </div>
           <button onclick="submitUsername()" style="width: 100%; margin-top: 10px; background: var(--primary-color); color: #ffffff; border-color: var(--primary-color);">
-            Weiter zur Raumauswahl →
+            Weiter zur Kanalauswahl →
           </button>
         </div>
 
@@ -602,6 +625,11 @@
           <input type="checkbox" id="muteVoice">
           Mute Voice
         </label>
+
+        <label style="display:flex;align-items:center;gap:6px;cursor: pointer; margin-left: 20px; font-weight: 600; color: var(--primary-color);">
+          <input type="checkbox" id="compactMode" onchange="toggleCompactMode()">
+          Compact Mode
+        </label>
       </div>
 
       <div class="main">
@@ -630,7 +658,7 @@
     <div id="toast"></div>
 
     <script>
-      // Theme Switcher Logik
+      // Theme Logik laden
       const currentTheme = localStorage.getItem("theme") || "light";
       document.documentElement.setAttribute("data-theme", currentTheme);
 
@@ -640,6 +668,29 @@
         localStorage.setItem("theme", theme);
       }
 
+      // Compact Mode initialisieren
+      if (localStorage.getItem("compactMode") === "true") {
+        document.body.classList.add("compact");
+        document.getElementById("compactMode").checked = true;
+      }
+
+      function toggleCompactMode() {
+        const isCompact = document.getElementById("compactMode").checked;
+        document.body.classList.toggle("compact", isCompact);
+        localStorage.setItem("compactMode", isCompact);
+      }
+
+      // INTELIGENTER AUTO-LOGIN BEIM START
+      window.addEventListener('DOMContentLoaded', () => {
+        const savedName = localStorage.getItem("savedNickname");
+        if (savedName) {
+          document.getElementById("username").value = savedName;
+          // Direkt ohne Animation zu Schritt 2 springen
+          document.getElementById("stepUsernameBox").className = "setup-box exit-left";
+          document.getElementById("stepRoomsBox").className = "setup-box active";
+        }
+      });
+
       // --- ANIMATIONS-LOGIK FÜR DIE LOBBY ---
       function submitUsername() {
         const username = document.getElementById("username").value.trim();
@@ -647,6 +698,9 @@
           showMessage("⚠ Bitte trage zuerst einen Spielernamen ein!");
           return;
         }
+        
+        // Lokaler Speicher füllen
+        localStorage.setItem("savedNickname", username);
         
         const box1 = document.getElementById("stepUsernameBox");
         box1.className = "setup-box exit-left";
@@ -656,6 +710,9 @@
       }
 
       function backToUsername() {
+        // Lokaler Speicher leeren bei bewusster Änderung
+        localStorage.removeItem("savedNickname");
+        
         const box2 = document.getElementById("stepRoomsBox");
         box2.className = "setup-box ready-right";
         
@@ -785,7 +842,7 @@
         document.getElementById("userList").innerHTML = "";
         document.getElementById("chatBox").innerHTML = "";
         
-        // OPTIMIERUNG: Direkt zu Schritt 2 springen, da der Name ja bereits existiert
+        // Zurück zu Schritt 2 springen
         document.getElementById("stepUsernameBox").className = "setup-box exit-left";
         document.getElementById("stepRoomsBox").className = "setup-box active";
         updateUI();
@@ -963,6 +1020,9 @@ ${d.toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"})} • <span sty
 <span id="t${i}" style="font-family: monospace; font-size: 15px; font-weight: 700;">READY</span>
 <div class="dot green" id="dot${i}"></div>
 </div>
+<div class="progress-container">
+  <div class="progress-bar" id="pbar${i}"></div>
+</div>
 </div>`;
       }
 
@@ -971,23 +1031,39 @@ ${d.toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"})} • <span sty
           const el = document.getElementById("t" + i);
           const card = document.getElementById("card" + i);
           const dot = document.getElementById("dot" + i);
+          const pbar = document.getElementById("pbar" + i);
           const data = timersData[i];
+          
           if (!data) {
             el.innerText = "READY"; dot.className = "dot green";
             card.classList.remove("orangeWarn", "greenWarn");
+            pbar.style.width = "0%";
             lastRemaining[i] = null; continue;
           }
+          
           const remaining = data.duration - ((Date.now() - data.startTime) / 1000);
+          
           if (remaining > 0) {
             const m = Math.floor(remaining / 60); const s = Math.floor(remaining % 60);
             el.innerText = `${m}:${String(s).padStart(2,"0")}`;
             dot.className = "dot " + (remaining < 60 ? "orange" : "red");
             card.classList.remove("greenWarn");
             card.classList.toggle("orangeWarn", remaining < 60);
+            
+            // Progress Berechnung (Füllt sich auf 100% je näher das Ende rückt)
+            const pct = ((data.duration - remaining) / data.duration) * 100;
+            pbar.style.width = `${pct}%`;
+            pbar.style.backgroundColor = remaining < 60 ? "var(--color-orange)" : "var(--color-red)";
           } else {
             const over = Math.abs(remaining); const m = Math.floor(over / 60); const s = Math.floor(over % 60);
             el.innerText = `+${m}:${String(s).padStart(2,"0")}`;
-            dot.className = "dot green"; card.classList.remove("orangeWarn"); card.classList.add("greenWarn");
+            dot.className = "dot green"; 
+            card.classList.remove("orangeWarn"); 
+            card.classList.add("greenWarn");
+            
+            pbar.style.width = "100%";
+            pbar.style.backgroundColor = "var(--color-green)";
+            
             if (lastRemaining[i] > 0) {
               speak("C H " + i + " ready");
               if (navigator.vibrate) navigator.vibrate([300, 100, 300]);
