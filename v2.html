@@ -20,6 +20,47 @@
         padding-bottom: 20px;
       }
 
+      /* GLOBALE & DEZENTE SCROLLBALKEN ANPASSUNG */
+      #userList::-webkit-scrollbar,
+      #chatBox::-webkit-scrollbar,
+      #roomListBox::-webkit-scrollbar,
+      .sidebar-content::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+      }
+
+      #userList::-webkit-scrollbar-track,
+      #chatBox::-webkit-scrollbar-track,
+      #roomListBox::-webkit-scrollbar-track,
+      .sidebar-content::-webkit-scrollbar-track {
+        background: #0b0b0b;
+        border-radius: 10px;
+      }
+
+      #userList::-webkit-scrollbar-thumb,
+      #chatBox::-webkit-scrollbar-thumb,
+      #roomListBox::-webkit-scrollbar-thumb,
+      .sidebar-content::-webkit-scrollbar-thumb {
+        background: #252525;
+        border-radius: 10px;
+        transition: background 0.2s;
+      }
+
+      #userList::-webkit-scrollbar-thumb:hover,
+      #chatBox::-webkit-scrollbar-thumb:hover,
+      #roomListBox::-webkit-scrollbar-thumb:hover,
+      .sidebar-content::-webkit-scrollbar-thumb:hover {
+        background: #353535;
+      }
+
+      #userList,
+      #chatBox,
+      #roomListBox,
+      .sidebar-content {
+        scrollbar-width: thin;
+        scrollbar-color: #252525 #0b0b0b;
+      }
+
       /* Aufgeräumte Topbar */
       .topbar {
         display: flex;
@@ -28,11 +69,18 @@
         background: #111;
         border-bottom: 1px solid #222;
         align-items: center;
+        gap: 10px;
       }
 
       .topbar-brand strong {
         font-size: 16px;
         letter-spacing: 1px;
+      }
+
+      .topbar-right {
+        display: flex;
+        align-items: center;
+        gap: 15px;
       }
 
       input,
@@ -73,7 +121,7 @@
         display: none !important;
       }
 
-      /* Neuer zentraler Login- & Raum-Auswahl-Bereich */
+      /* Zentraler Login- & Raum-Auswahl-Bereich */
       .lobby-wrapper {
         display: flex;
         flex-direction: column;
@@ -303,6 +351,143 @@
         border-radius: 8px;
         gap: 10px;
       }
+
+      #roomListBox {
+        background: #111;
+        border: 1px solid #333;
+        padding: 15px;
+        border-radius: 10px;
+        width: 100%;
+        max-width: 450px;
+        max-height: 400px;
+        overflow: auto;
+        box-sizing: border-box;
+      }
+
+      /* --- SIDEBAR / INFOREGION OVERLAY SYSTEM --- */
+      .sidebar-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.7);
+        z-index: 10000;
+        display: none;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+      }
+
+      .sidebar-overlay.active {
+        display: block;
+        opacity: 1;
+      }
+
+      .sidebar {
+        position: fixed;
+        top: 0;
+        right: -400px;
+        width: 100%;
+        max-width: 380px;
+        height: 100%;
+        background: #111;
+        border-left: 1px solid #222;
+        box-shadow: -5px 0 25px rgba(0,0,0,0.5);
+        z-index: 10001;
+        transition: right 0.3s ease;
+        display: flex;
+        flex-direction: column;
+        box-sizing: border-box;
+      }
+
+      .sidebar.active {
+        right: 0;
+      }
+
+      .sidebar-header {
+        padding: 20px;
+        border-bottom: 1px solid #222;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .sidebar-header h2 {
+        margin: 0;
+        font-size: 18px;
+        color: #00ff88;
+        letter-spacing: 0.5px;
+      }
+
+      .close-sidebar-btn {
+        background: none;
+        border: none;
+        color: #888;
+        font-size: 24px;
+        cursor: pointer;
+        padding: 0;
+        line-height: 1;
+      }
+
+      .close-sidebar-btn:hover {
+        color: #fff;
+      }
+
+      .sidebar-content {
+        padding: 20px;
+        overflow-y: auto;
+        flex: 1;
+      }
+
+      .info-section {
+        margin-bottom: 25px;
+      }
+
+      .info-section h4 {
+        margin-top: 0;
+        margin-bottom: 12px;
+        color: #aaa;
+        font-size: 14px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        border-bottom: 1px solid #222;
+        padding-bottom: 5px;
+      }
+
+      /* Anleitung Liste */
+      .guide-list {
+        padding-left: 20px;
+        margin: 0;
+      }
+
+      .guide-list li {
+        margin-bottom: 10px;
+        font-size: 13px;
+        color: #ccc;
+        line-height: 1.5;
+      }
+
+      /* Legende Layout */
+      .legend-item {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        margin-bottom: 14px;
+        font-size: 13px;
+        line-height: 1.4;
+      }
+
+      .legend-item .dot {
+        margin-top: 3px;
+      }
+
+      .legend-box-preview {
+        width: 45px;
+        height: 22px;
+        border-radius: 4px;
+        flex-shrink: 0;
+        background: rgba(255,255,255,0.04);
+      }
     </style>
   </head>
 
@@ -312,13 +497,85 @@
       <div class="topbar-brand">
         <strong>CD TIMER HUD</strong>
       </div>
-      <div>
-        <span id="roomLabel" style="color: #aaa; font-size: 14px;">Nicht verbunden</span>
-      </div>
-      <div id="leaveBox" class="hidden">
-        <button onclick="leaveRoom()" style="background:#ff4040;border-color:#ff4040;">
-          Leave Channel
+      <div class="topbar-right">
+        <div>
+          <span id="roomLabel" style="color: #aaa; font-size: 14px;">Nicht verbunden</span>
+        </div>
+        <div id="leaveBox" class="hidden">
+          <button onclick="leaveRoom()" style="background:#ff4040;border-color:#ff4040; padding: 6px 12px; font-size: 13px;">
+            Leave Channel
+          </button>
+        </div>
+        <button onclick="toggleSidebar(true)" style="background: #1a1a1a; border-color: #333; padding: 6px 12px; font-size: 13px; color: #00ff88;">
+          &#x2139;
         </button>
+      </div>
+    </div>
+
+    <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar(false)"></div>
+    <div class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <h2>Handbuch & Legende</h2>
+        <button class="close-sidebar-btn" onclick="toggleSidebar(false)">&times;</button>
+      </div>
+      <div class="sidebar-content">
+        
+        <div class="info-section">
+          <h4>Bedienungsanleitung</h4>
+          <ol class="guide-list">
+            <li>Trage zuerst im Hauptfenster deinen <strong>Spielernamen</strong> ein, um Schritt 2 freizuschalten.</li>
+            <li>Wähle einen der vordefinierten, festen Channels aus der Liste oder erstelle einen eigenen via Textfeld.</li>
+            <li>Sobald du verbunden bist, siehst du die Timer-Ansicht für alle Channels (CH1 - CH8).</li>
+            <li>Stelle bei Bedarf oben die gewünschte <strong>Minutenanzahl</strong> ein (Standard: 18 Minuten).</li>
+            <li>Klicke auf <strong>Start</strong> bei dem jeweiligen CH, um den Cooldown für das gesamte Team zu aktivieren.</li>
+            <li>Über <strong>Reset</strong> löschst du den aktiven Timer wieder komplett.</li>
+          </ol>
+        </div>
+
+        <div class="info-section">
+          <h4>Farb- & Statuslegende</h4>
+          
+          <div class="legend-item">
+            <div class="dot green"></div>
+            <div>
+              <strong>Bereit (READY)</strong><br>
+              <span style="color: #888;">Es läuft aktuell kein Timer auf diesem CH. Der Boss/Metin kann angegangen werden.</span>
+            </div>
+          </div>
+
+          <div class="legend-item">
+            <div class="dot red"></div>
+            <div>
+              <strong>Gesperrt (Laufzeit)</strong><br>
+              <span style="color: #888;">Der Cooldown läuft. Der Punkt bleibt rot, solange die Restzeit über einer Minute liegt.</span>
+            </div>
+          </div>
+
+          <div class="legend-item">
+            <div class="dot orange"></div>
+            <div>
+              <strong>Kritische Phase (&lt; 1 Min.)</strong><br>
+              <span style="color: #888;">Weniger als 60 Sekunden verbleibend. Bereite dich oder dein Team auf den Spawn vor.</span>
+            </div>
+          </div>
+
+          <div class="legend-item">
+            <div class="legend-box-preview orangeWarn"></div>
+            <div>
+              <strong>Blinkender Oranger Rahmen</strong><br>
+              <span style="color: #888;">Visueller Alarm: Der Timer läuft gleich ab (unter 60 Sekunden).</span>
+            </div>
+          </div>
+
+          <div class="legend-item">
+            <div class="legend-box-preview greenWarn"></div>
+            <div>
+              <strong>Blinkender Grüner Rahmen (+ Zeit)</strong><br>
+              <span style="color: #888;">Der Cooldown ist abgelaufen! Die Sprachausgabe ertönt einmalig. Die "+ Zeit" zeigt an, wie lange der CH schon offen steht.</span>
+            </div>
+          </div>
+        </div>
+
       </div>
     </div>
 
@@ -348,7 +605,9 @@
 
           <div style="margin-top: 20px;">
             <strong style="font-size: 14px; display: block; margin-bottom: 10px;">Verfügbare Räume:</strong>
-            <div id="roomList"></div>
+            <div id="roomListBox">
+              <div id="roomList"></div>
+            </div>
           </div>
         </div>
 
@@ -418,7 +677,6 @@
       let chatRef = null;
       let usersRef = null;
 
-      // DEINE AKTUALISIERTEN FESTEN RÄUME
       const FIXED_ROOMS = [
         "Orctal Schatten 1",
         "Orctal Schatten 2",
@@ -426,7 +684,19 @@
         "Orctal Seele 2"
       ];
 
-      // Schaltet die Raum-Sektion frei, sobald ein Username eingetippt wurde
+      // Sidebar Steuerungs-Funktion
+      function toggleSidebar(open) {
+        const overlay = document.getElementById("sidebarOverlay");
+        const sidebar = document.getElementById("sidebar");
+        if(open) {
+          overlay.classList.add("active");
+          sidebar.classList.add("active");
+        } else {
+          overlay.classList.remove("active");
+          sidebar.classList.remove("active");
+        }
+      }
+
       function toggleLobbyFields() {
         const username = document.getElementById("username").value.trim();
         const roomsBox = document.getElementById("stepRoomsBox");
@@ -684,7 +954,7 @@
         });
         
         input.value = "";
-        input.focus(); // Setzt den Cursor sofort wieder in das Textfeld
+        input.focus();
 
         chatRef.once("value", snap => {
           if (snap.exists()) {
