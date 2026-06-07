@@ -4,11 +4,8 @@
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-	<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
-	<link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
-	<link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
-	<link rel="manifest" href="/site.webmanifest">
-    <title>SpawnPulse - Metin2 CD Timer</title>
+
+    <title>CD Timer HUD</title>
 
     <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-database-compat.js"></script>
@@ -71,6 +68,7 @@
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
         padding-bottom: 20px;
         transition: background 0.3s, color 0.3s;
+        overflow-x: hidden; /* Verhindert Scrollbalken während der Slides */
       }
 
       /* SCROLLBALKEN ANPASSUNG */
@@ -134,7 +132,7 @@
         height: 32px;
         width: 32px;
         object-fit: cover;
-        border-radius: 6px; /* Optionale leichte Rundung für modernen Look */
+        border-radius: 6px;
       }
 
       .topbar-brand strong {
@@ -183,17 +181,18 @@
         margin: auto;
         padding: 16px;
         box-sizing: border-box;
+        position: relative;
       }
 
       .hidden { display: none !important; }
 
+      /* --- SLIDE ANIMATIONEN & LOBBY SYSTEM --- */
       .lobby-wrapper {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: 20px;
-        margin-top: 40px;
+        position: relative;
         width: 100%;
+        max-width: 450px;
+        margin: 60px auto 0 auto;
+        min-height: 400px;
       }
 
       .setup-box {
@@ -202,9 +201,36 @@
         padding: 24px;
         border-radius: 12px;
         width: 100%;
-        max-width: 450px;
         box-sizing: border-box;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+        position: absolute;
+        top: 0;
+        left: 0;
+        transition: transform 0.5s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.5s ease;
+      }
+
+      /* Zustand: Sichtbar im Fokus */
+      .setup-box.active {
+        transform: translateX(0);
+        opacity: 1;
+        z-index: 2;
+        pointer-events: auto;
+      }
+
+      /* Zustand: Nach links rausgerutscht */
+      .setup-box.exit-left {
+        transform: translateX(-150%);
+        opacity: 0;
+        z-index: 1;
+        pointer-events: none;
+      }
+
+      /* Zustand: Wartend auf der rechten Seite */
+      .setup-box.ready-right {
+        transform: translateX(150%);
+        opacity: 0;
+        z-index: 1;
+        pointer-events: none;
       }
 
       .setup-box h3 {
@@ -386,13 +412,12 @@
         padding: 10px;
         border-radius: 8px;
         width: 100%;
-        max-width: 450px;
-        max-height: 300px;
+        max-height: 220px;
         overflow: auto;
         box-sizing: border-box;
       }
 
-      /* Runde Control Buttons (Info & Theme) */
+      /* Runde Control Buttons */
       .control-btn {
         background: var(--button-bg);
         border: 1px solid var(--border-color);
@@ -467,7 +492,7 @@
     <div class="topbar">
       <div class="topbar-brand">
         <img src="logo_header.png" alt="Logo" class="topbar-logo">
-        <strong>SpawnPulse</strong>
+        <strong>CD TIMER HUD</strong>
       </div>
       <div class="topbar-right">
         <div>
@@ -490,11 +515,10 @@
         <button class="close-sidebar-btn" onclick="toggleSidebar(false)">&times;</button>
       </div>
       <div class="sidebar-content">
-        
         <div class="info-section">
           <h4>Bedienungsanleitung</h4>
           <ol class="guide-list">
-            <li>Trage zuerst deinen <strong>Spielernamen</strong> ein, um Schritt 2 freizuschalten.</li>
+            <li>Trage deinen <strong>Spielernamen</strong> ein und bestätige.</li>
             <li>Wähle einen Raum aus der Liste oder erstelle einen eigenen via Textfeld.</li>
             <li>Sobald du verbunden bist, siehst du die Live-Timer für alle Channels (CH1 - CH8).</li>
             <li>Stelle bei Bedarf oben die gewünschte <strong>Minutenanzahl</strong> ein.</li>
@@ -505,48 +529,27 @@
 
         <div class="info-section">
           <h4>Farb- & Statuslegende</h4>
-          
           <div class="legend-item">
             <div class="dot green"></div>
-            <div>
-              <strong>Bereit (READY)</strong><br>
-              <span style="color: var(--topbar-subtext);">Es läuft kein Timer. Der Spawn steht offen.</span>
-            </div>
+            <div><strong>Bereit (READY)</strong><br><span style="color: var(--topbar-subtext);">Es läuft kein Timer. Der Spawn steht offen.</span></div>
           </div>
-
           <div class="legend-item">
             <div class="dot red"></div>
-            <div>
-              <strong>Gesperrt (Laufzeit)</strong><br>
-              <span style="color: var(--topbar-subtext);">Der Cooldown läuft. Restzeit liegt über einer Minute.</span>
-            </div>
+            <div><strong>Gesperrt (Laufzeit)</strong><br><span style="color: var(--topbar-subtext);">Der Cooldown läuft. Restzeit liegt über einer Minute.</span></div>
           </div>
-
           <div class="legend-item">
             <div class="dot orange"></div>
-            <div>
-              <strong>Kritische Phase (&lt; 1 Min.)</strong><br>
-              <span style="color: var(--topbar-subtext);">Weniger als 60 Sekunden verbleibend.</span>
-            </div>
+            <div><strong>Kritische Phase (&lt; 1 Min.)</strong><br><span style="color: var(--topbar-subtext);">Weniger als 60 Sekunden verbleibend.</span></div>
           </div>
-
           <div class="legend-item">
             <div class="legend-box-preview orangeWarn"></div>
-            <div>
-              <strong>Blinkender Oranger Rahmen</strong><br>
-              <span style="color: var(--topbar-subtext);">Visueller Alarm: Der Timer läuft gleich ab.</span>
-            </div>
+            <div><strong>Blinkender Oranger Rahmen</strong><br><span style="color: var(--topbar-subtext);">Visueller Alarm: Der Timer läuft gleich ab.</span></div>
           </div>
-
           <div class="legend-item">
             <div class="legend-box-preview greenWarn"></div>
-            <div>
-              <strong>Blinkender Grüner Rahmen (+ Zeit)</strong><br>
-              <span style="color: var(--topbar-subtext);">Der Cooldown ist abgelaufen! Die "+ Zeit" zeigt an, wie lange der CH schon offen steht.</span>
-            </div>
+            <div><strong>Blinkender Grüner Rahmen (+ Zeit)</strong><br><span style="color: var(--topbar-subtext);">Der Cooldown ist abgelaufen! Die "+ Zeit" zeigt an, wie lange der CH schon offen steht.</span></div>
           </div>
         </div>
-
       </div>
     </div>
 
@@ -554,16 +557,19 @@
 
       <div id="lobbyContainer" class="lobby-wrapper">
         
-        <div class="setup-box" id="stepUsernameBox">
-          <h3>1. Profil</h3>
+        <div class="setup-box active" id="stepUsernameBox">
+          <h3>Namen auswählen</h3>
           <div class="input-group">
             <label for="username" style="font-size: 13px; color: var(--topbar-subtext); font-weight: 500;">Dein Spielername:</label>
-            <input id="username" placeholder="z.B. SuraGott" oninput="toggleLobbyFields()">
+            <input id="username" placeholder="z.B. SuraGott" onkeydown="if(event.key === 'Enter') submitUsername()">
           </div>
+          <button onclick="submitUsername()" style="width: 100%; margin-top: 10px; background: var(--primary-color); color: #ffffff; border-color: var(--primary-color);">
+            Weiter zur Raumauswahl →
+          </button>
         </div>
 
-        <div class="setup-box" id="stepRoomsBox" style="opacity: 0.4; pointer-events: none; transition: opacity 0.3s;">
-          <h3>2. Channel wählen</h3>
+        <div class="setup-box ready-right" id="stepRoomsBox">
+          <h3>Raum wählen</h3>
           
           <div class="input-group">
             <label style="font-size: 13px; color: var(--topbar-subtext); font-weight: 500;">Eigenen Channel erstellen oder suchen:</label>
@@ -574,12 +580,16 @@
             </div>
           </div>
 
-          <div style="margin-top: 20px;">
+          <div style="margin-top: 15px;">
             <strong style="font-size: 14px; display: block; margin-bottom: 10px; color: var(--text-color);">Verfügbare Räume:</strong>
             <div id="roomListBox">
               <div id="roomList"></div>
             </div>
           </div>
+          
+          <button onclick="backToUsername()" style="width: 100%; margin-top: 15px; background: transparent; border: none; color: var(--topbar-subtext); font-size: 13px; font-weight: 500;">
+            ← Name ändern
+          </button>
         </div>
 
       </div>
@@ -595,7 +605,6 @@
       </div>
 
       <div class="main">
-
         <div class="timers">
           <div id="list" class="hidden"></div>
         </div>
@@ -614,7 +623,6 @@
             </div>
           </div>
         </div>
-
       </div>
 
     </div>
@@ -622,7 +630,7 @@
     <div id="toast"></div>
 
     <script>
-      // Theme Switcher Logik (LocalStorage basierend)
+      // Theme Switcher Logik
       const currentTheme = localStorage.getItem("theme") || "light";
       document.documentElement.setAttribute("data-theme", currentTheme);
 
@@ -631,6 +639,30 @@
         document.documentElement.setAttribute("data-theme", theme);
         localStorage.setItem("theme", theme);
       }
+
+      // --- ANIMATIONS-LOGIK FÜR DIE LOBBY ---
+      function submitUsername() {
+        const username = document.getElementById("username").value.trim();
+        if (!username) {
+          showMessage("⚠ Bitte trage zuerst einen Spielernamen ein!");
+          return;
+        }
+        
+        const box1 = document.getElementById("stepUsernameBox");
+        box1.className = "setup-box exit-left";
+        
+        const box2 = document.getElementById("stepRoomsBox");
+        box2.className = "setup-box active";
+      }
+
+      function backToUsername() {
+        const box2 = document.getElementById("stepRoomsBox");
+        box2.className = "setup-box ready-right";
+        
+        const box1 = document.getElementById("stepUsernameBox");
+        box1.className = "setup-box active";
+      }
+
 
       const firebaseConfig = {
         apiKey: "AIzaSyCx52T35a9Jvsrbl51abjdN0hsSxo7z27M",
@@ -672,18 +704,6 @@
         }
       }
 
-      function toggleLobbyFields() {
-        const username = document.getElementById("username").value.trim();
-        const roomsBox = document.getElementById("stepRoomsBox");
-        if (username.length > 0) {
-          roomsBox.style.opacity = "1";
-          roomsBox.style.pointerEvents = "auto";
-        } else {
-          roomsBox.style.opacity = "0.4";
-          roomsBox.style.pointerEvents = "none";
-        }
-      }
-
       function initFixedRooms() {
         FIXED_ROOMS.forEach(room => {
           db.ref(`rooms/${room}/isFixed`).set(true);
@@ -699,7 +719,6 @@
           document.getElementById("roomLabel").innerHTML = `Aktiv: <span style="color: var(--primary-color); font-weight:700;">${ROOM}</span>`;
         } else {
           document.getElementById("roomLabel").innerText = "Nicht verbunden";
-          toggleLobbyFields();
         }
       }
 
@@ -765,6 +784,10 @@
         document.getElementById("usersBox").classList.remove("active");
         document.getElementById("userList").innerHTML = "";
         document.getElementById("chatBox").innerHTML = "";
+        
+        // OPTIMIERUNG: Direkt zu Schritt 2 springen, da der Name ja bereits existiert
+        document.getElementById("stepUsernameBox").className = "setup-box exit-left";
+        document.getElementById("stepRoomsBox").className = "setup-box active";
         updateUI();
       }
 
