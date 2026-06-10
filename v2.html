@@ -903,7 +903,19 @@
         if (usersRef) usersRef.off();
         roomRef = chatRef = usersRef = null;
         speechSynthesis.cancel();
-        ROOM = null; timersData = {}; lastRemaining = {}; domStates = {};
+        
+        // --- HIER IST DIE REPARATUR ---
+        ROOM = null; 
+        timersData = {}; 
+        lastRemaining = {}; 
+        
+        // Setzt die internen Zustände für alle 8 Channels komplett zurück
+        domStates = {};
+        for (let i = 1; i <= 8; i++) {
+          domStates[i] = {};
+        }
+        // ------------------------------
+
         document.getElementById("list").classList.add("hidden");
         document.getElementById("settings").classList.remove("active");
         document.getElementById("usersBox").classList.remove("active");
