@@ -35,7 +35,8 @@
         --color-green: #38a169;
         --color-red: #e53e3e;
         --color-orange: #dd6b20;
-        --card-glow: none;
+        --card-glow-red: none;
+        --card-glow-orange: none;
         --progress-bg: #edf2f7;
       }
 
@@ -61,7 +62,8 @@
         --color-green: #00ff88;
         --color-red: #ff4040;
         --color-orange: #ff9f1a;
-        --card-glow: 0 0 15px rgba(255, 159, 26, 0.25);
+        --card-glow-red: 0 0 15px rgba(255, 64, 64, 0.2);
+        --card-glow-orange: 0 0 20px rgba(255, 159, 26, 0.35);
         --progress-bg: #1a1a1a;
       }
 
@@ -81,7 +83,6 @@
         user-select: none;
       }
 
-      /* TEXTFELDER MÜSSEN BESCHREIBBAR BLEIBEN */
       input, textarea {
         -webkit-user-select: text;
         -moz-user-select: text;
@@ -350,7 +351,7 @@
         box-shadow: 0 2px 4px rgba(0,0,0,0.02);
         position: relative;
         overflow: hidden;
-        transition: transform 0.15s ease, box-shadow 0.3s ease, padding 0.2s ease;
+        transition: transform 0.15s ease, box-shadow 0.3s ease, padding 0.2s ease, border-color 0.3s ease;
       }
 
       .hud-card:hover {
@@ -360,23 +361,36 @@
 
       @media (min-width: 480px) {
         .hud-card { grid-template-columns: 60px 1fr 140px; text-align: left; }
-        .center { justify-content: center; }
+        .center { display: flex; gap: 4px; justify-content: center; flex-direction: column; }
         .right { justify-content: flex-end; }
       }
 
       .center { display: flex; gap: 8px; justify-content: center; }
       .right { display: flex; gap: 12px; justify-content: center; align-items: center; }
 
+      .card-user-tag {
+        font-size: 11px;
+        color: var(--topbar-subtext);
+        text-align: center;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 130px;
+      }
+
       .dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
       .green { background: var(--color-green); }
       .red { background: var(--color-red); }
       .orange { background: var(--color-orange); }
 
-      /* Kritische Alarm-Modi */
+      .hud-card.timer-running {
+        box-shadow: var(--card-glow-red);
+      }
+
       .orangeWarn {
         border: 2px solid var(--color-orange) !important;
         background: var(--orange-warn-bg) !important;
-        box-shadow: var(--card-glow);
+        box-shadow: var(--card-glow-orange) !important;
         animation: blink .8s infinite;
       }
 
@@ -386,16 +400,14 @@
         animation: greenBlink .8s infinite;
       }
 
-      /* Dynamisches Pulsieren des Fortschrittsbalkens bei extremen Überzeiten */
       .overtime-pulse {
         animation: overBlink 1.5s infinite ease-in-out;
       }
 
-      @keyframes blink { 50% { border-color: transparent; } }
+      @keyframes blink { 50% { border-color: transparent; box-shadow: none !important; } }
       @keyframes greenBlink { 50% { border-color: transparent; } }
       @keyframes overBlink { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
 
-      /* Progress Bar Container & Line */
       .progress-container {
         position: absolute;
         bottom: 0;
@@ -412,15 +424,28 @@
         transition: width 1s linear, background-color 0.3s ease;
       }
 
-      /* --- COMPACT MODE LAYOUT OVERRIDES --- */
+      /* --- COMPACT MODE LAYOUT MIT TEXT-BUTTONS --- */
       body.compact .container { max-width: 900px; }
       body.compact .hud-card {
-        padding: 8px 14px;
+        padding: 6px 14px;
         margin-bottom: 6px;
         border-radius: 8px;
         font-size: 13px;
+        grid-template-columns: 50px 1fr 130px;
       }
-      body.compact .hud-card button { padding: 6px 10px; font-size: 12px; border-radius: 6px; }
+      body.compact .center { flex-direction: row; align-items: center; justify-content: flex-start; gap: 8px; }
+      body.compact .card-user-tag { text-align: left; max-width: 80px; }
+      
+      /* Buttons bleiben eckig mit Text, werden nur kompakter formatiert */
+      body.compact .hud-card button { 
+        padding: 4px 8px; 
+        font-size: 11px; 
+        border-radius: 6px; 
+        width: auto; 
+        height: auto; 
+        display: inline-block;
+        line-height: 1.2;
+      }
       body.compact .usersPanel { height: 420px; }
 
       #toast {
@@ -567,6 +592,7 @@
             <li>Wähle einen Raum aus der Liste oder erstelle einen eigenen via Textfeld.</li>
             <li>Stelle oben die gewünschte <strong>Minutenanzahl</strong> ein.</li>
             <li>Klicke auf <strong>Start</strong> bei dem jeweiligen CH, um den Cooldown zu aktivieren. Ein Fortschrittsbalken am unteren Kartenrand visualisiert die Restzeit.</li>
+            <li><strong>Tastatur-Hotkeys (Numpad):</strong> Wenn du in einem Raum bist, kannst du die Tasten <code>1</code> bis <code>8</code> auf deinem Nummernblock nutzen, um den Timer des jeweiligen Kanals blitzschnell zu starten!</li>
             <li><strong>Compact Mode:</strong> Aktiviere den Modus in den Einstellungen, um Platz zu sparen, falls das HUD auf einem Nebenbildschirm läuft.</li>
           </ol>
         </div>
@@ -587,7 +613,7 @@
           </div>
           <div class="legend-item">
             <div class="legend-box-preview orangeWarn"></div>
-            <div><strong>Blinkender Oranger Rahmen + Glow</strong><br><span style="color: var(--topbar-subtext);">Visueller Alarm: Im Dunkelmodus pulsiert die Karte zusätzlich.</span></div>
+            <div><strong>Blinkender Oranger Rahmen + Glow</strong><br><span style="color: var(--topbar-subtext);">Visueller Alarm: Im Dunkelmodus pulsiert die Karte zusätzlich intensiv.</span></div>
           </div>
           <div class="legend-item">
             <div class="legend-box-preview greenWarn"></div>
@@ -686,10 +712,8 @@
     <div id="toast"></div>
 
     <script>
-      // DOM Cache für ultra-schnelle Updates ohne ständige Suchanfragen
       let domCache = {};
 
-      // Theme Logik laden
       const currentTheme = localStorage.getItem("theme") || "light";
       document.documentElement.setAttribute("data-theme", currentTheme);
 
@@ -699,7 +723,6 @@
         localStorage.setItem("theme", theme);
       }
 
-      // Compact Mode initialisieren
       if (localStorage.getItem("compactMode") === "true") {
         document.body.classList.add("compact");
         document.getElementById("compactMode").checked = true;
@@ -711,7 +734,24 @@
         localStorage.setItem("compactMode", isCompact);
       }
 
-      // AUTO-LOGIN BEIM START
+      // TASTATUR-HOTKEY LOGIK (NUMPAD 1-8 ODER DIGIT 1-8)
+      document.addEventListener("keydown", (e) => {
+        if (!ROOM) return;
+        if (["INPUT", "TEXTAREA"].includes(document.activeElement.tagName)) return;
+
+        let channelNum = null;
+        if (e.code.startsWith("Numpad") && e.code.length === 7) {
+          channelNum = parseInt(e.code.charAt(6));
+        } else if (e.code.startsWith("Digit") && e.code.length === 6) {
+          channelNum = parseInt(e.code.charAt(5));
+        }
+
+        if (channelNum >= 1 && channelNum <= 8) {
+          e.preventDefault();
+          start(channelNum);
+        }
+      });
+
       window.addEventListener('DOMContentLoaded', () => {
         const savedName = localStorage.getItem("savedNickname");
         if (savedName) {
@@ -760,7 +800,7 @@
       let ROOM = null;
       let timersData = {};
       let lastRemaining = {};
-      let domStates = {}; // Speichert den letzten gerenderten Zustand der UI-Karten
+      let domStates = {};
       let roomRef = null;
       let chatRef = null;
       let usersRef = null;
@@ -797,14 +837,10 @@
         }
       }
 
-      // Optimierte Audio-Queue-Logik gegen "Verschlucken"
       function speak(text) {
         if (document.getElementById("muteVoice").checked) return;
-        
-        // speechSynthesis.cancel() bricht radikal ab, fängt aber Hänger ab
         if (speechSynthesis.speaking) speechSynthesis.cancel();
         
-        // Kurzer Timeout entlastet die Browser-Audio-Engine
         setTimeout(() => {
           const msg = new SpeechSynthesisUtterance(text);
           msg.lang = "de-DE";
@@ -827,7 +863,6 @@
 
       function setRoom(r) {
         ROOM = r;
-        // Vorheriges lokales Backup laden, falls vorhanden (Überbrückungsschutz)
         const localBackup = localStorage.getItem(`backup_timers_${ROOM}`);
         if (localBackup && Object.keys(timersData).length === 0) {
           try { timersData = JSON.parse(localBackup); } catch(e){}
@@ -1036,7 +1071,6 @@ ${d.toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"})} • <span sty
         roomRef = db.ref(`rooms/${ROOM}/timers`);
         roomRef.on("value", snap => { 
           timersData = snap.val() || {}; 
-          // Lokales Ausfall-Backup wegschreiben
           if (ROOM) localStorage.setItem(`backup_timers_${ROOM}`, JSON.stringify(timersData));
           renderAll(); 
         });
@@ -1050,8 +1084,11 @@ ${d.toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"})} • <span sty
 <div class="hud-card" id="card${i}">
 <div><strong>CH${i}</strong></div>
 <div class="center">
-<button onclick="start(${i})">Start</button>
-<button onclick="resetTimer(${i})">Reset</button>
+  <div style="display:flex; gap:8px;">
+    <button onclick="start(${i})">Start</button>
+    <button onclick="resetTimer(${i})">Reset</button>
+  </div>
+  <div class="card-user-tag" id="userTag${i}"></div>
 </div>
 <div class="right">
 <span id="t${i}" style="font-family: monospace; font-size: 15px; font-weight: 700;">READY</span>
@@ -1063,13 +1100,13 @@ ${d.toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"})} • <span sty
 </div>`;
       }
 
-      // Initialisiert den DOM Cache für die Elemente der Cards
       for (let i = 1; i <= 8; i++) {
         domCache[i] = {
           text: document.getElementById("t" + i),
           card: document.getElementById("card" + i),
           dot: document.getElementById("dot" + i),
-          pbar: document.getElementById("pbar" + i)
+          pbar: document.getElementById("pbar" + i),
+          userTag: document.getElementById("userTag" + i)
         };
         domStates[i] = {};
       }
@@ -1086,10 +1123,18 @@ ${d.toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"})} • <span sty
               cache.dot.className = "dot green";
               cache.card.className = "hud-card";
               cache.pbar.style.width = "0%";
+              cache.userTag.innerText = "";
               state.status = "READY";
+              state.user = "";
             }
             lastRemaining[i] = null; 
             continue;
+          }
+
+          const starterName = data.user ? `👤 ${data.user}` : "";
+          if (state.user !== starterName) {
+            cache.userTag.innerText = starterName;
+            state.user = starterName;
           }
           
           const remaining = data.duration - ((Date.now() - data.startTime) / 1000);
@@ -1100,17 +1145,15 @@ ${d.toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"})} • <span sty
             const timeText = `${m}:${String(s).padStart(2,"0")}`;
             const isCritical = remaining < 60;
             
-            // Text nur bei Änderung aktualisieren
             if (state.text !== timeText) {
               cache.text.innerText = timeText;
               state.text = timeText;
             }
             
-            // Status/Klassenwechsel filtern (Performance)
             const targetStatus = isCritical ? "CRITICAL" : "RUNNING";
             if (state.status !== targetStatus) {
               cache.dot.className = isCritical ? "dot orange" : "dot red";
-              cache.card.className = isCritical ? "hud-card orangeWarn" : "hud-card";
+              cache.card.className = isCritical ? "hud-card orangeWarn" : "hud-card timer-running";
               cache.pbar.style.backgroundColor = isCritical ? "var(--color-orange)" : "var(--color-red)";
               state.status = targetStatus;
             }
@@ -1151,14 +1194,17 @@ ${d.toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"})} • <span sty
       function parseMinutes(v) { return Math.floor(parseFloat(v.replace(",", ".")) * 60); }
 
       function start(ch) {
+        if (!ROOM) return;
         const durationSec = parseMinutes(document.getElementById("minutesInput").value);
+        const myName = document.getElementById("username").value.trim() || "User";
         db.ref(`rooms/${ROOM}/timers/${ch}`).set({
           startTime: Date.now(),
-          duration: durationSec
+          duration: durationSec,
+          user: myName
         });
       }
 
-      function resetTimer(ch) { db.ref(`rooms/${ROOM}/timers/${ch}`).remove(); }
+      function resetTimer(ch) { if (ROOM) db.ref(`rooms/${ROOM}/timers/${ch}`).remove(); }
 
       function resetAllTimers() {
         if (!ROOM) return;
