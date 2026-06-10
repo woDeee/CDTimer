@@ -5,16 +5,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
-    <title>CD Timer HUD</title>
+    <title>CD Timer HUD Pro</title>
 
     <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-database-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
-
-    	<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
-    <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
-    <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
-    <link rel="manifest" href="site.webmanifest">
 
     <style>
       /* --- VARIABLEN FÜR THEME-SWITCHER --- */
@@ -78,12 +73,15 @@
         padding-bottom: 20px;
         transition: background 0.3s, color 0.3s;
         overflow-x: hidden;
-        -webkit-user-select: none; /* Safari */
-        -moz-user-select: none;    /* Firefox */
-        -ms-user-select: none;     /* IE10+ */
-        user-select: none;         /* Standard (Chrome, Edge, etc.) */
+
+        /* BLOCKIERT JEGLICHE TEXTMARKIERUNG */
+        -webkit-user-select: none;
+        -moz-user-select: none;
+        -ms-user-select: none;
+        user-select: none;
       }
 
+      /* TEXTFELDER MÜSSEN BESCHREIBBAR BLEIBEN */
       input, textarea {
         -webkit-user-select: text;
         -moz-user-select: text;
@@ -197,7 +195,7 @@
 
       .hidden { display: none !important; }
 
-      /* --- LOBBY SYSTEM SYSTEM --- */
+      /* --- LOBBY SYSTEM --- */
       .lobby-wrapper {
         position: relative;
         width: 100%;
@@ -337,7 +335,7 @@
       .chatInputRow input { flex: 1; }
       .chatInputRow button { width: 80px; }
 
-      /* --- HUD CARDS & VISUELLE FEINSCHLIFFE --- */
+      /* --- HUD CARDS & ALARME --- */
       .hud-card {
         background: var(--card-bg);
         border: 1px solid var(--border-color);
@@ -351,7 +349,7 @@
         text-align: center;
         box-shadow: 0 2px 4px rgba(0,0,0,0.02);
         position: relative;
-        overflow: hidden; /* Wichtig für Progress Bar unten */
+        overflow: hidden;
         transition: transform 0.15s ease, box-shadow 0.3s ease, padding 0.2s ease;
       }
 
@@ -388,8 +386,14 @@
         animation: greenBlink .8s infinite;
       }
 
+      /* Dynamisches Pulsieren des Fortschrittsbalkens bei extremen Überzeiten */
+      .overtime-pulse {
+        animation: overBlink 1.5s infinite ease-in-out;
+      }
+
       @keyframes blink { 50% { border-color: transparent; } }
       @keyframes greenBlink { 50% { border-color: transparent; } }
+      @keyframes overBlink { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
 
       /* Progress Bar Container & Line */
       .progress-container {
@@ -529,10 +533,11 @@
 
   <body>
 
+    <!-- Topbar -->
     <div class="topbar">
       <div class="topbar-brand">
         <img src="logo_header.png" alt="Logo" class="topbar-logo">
-        <strong>CD TIMER HUD</strong>
+        <strong>CD TIMER HUD PRO</strong>
       </div>
       <div class="topbar-right">
         <div>
@@ -548,8 +553,13 @@
       </div>
     </div>
 
+    <!-- SIDEBAR COMPONENT -->
     <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar(false)"></div>
-    <div class="sidebar" id="sidebar">
+
+
+
+
+        <div class="sidebar" id="sidebar">
       <div class="sidebar-header">
         <h2>Handbuch & Legende</h2>
         <button class="close-sidebar-btn" onclick="toggleSidebar(false)">&times;</button>
@@ -594,10 +604,12 @@
 
     <div class="container">
 
+      <!-- Animierter Login- & Raum-Auswahlbereich -->
       <div id="lobbyContainer" class="lobby-wrapper">
         
+        <!-- SCHRITT 1: NICKNAME -->
         <div class="setup-box active" id="stepUsernameBox">
-          <h3>Namen auswählen</h3>
+          <h3>1. Profil erstellen</h3>
           <div class="input-group">
             <label for="username" style="font-size: 13px; color: var(--topbar-subtext); font-weight: 500;">Dein Spielername:</label>
             <input id="username" placeholder="z.B. SuraGott" onkeydown="if(event.key === 'Enter') submitUsername()">
@@ -607,8 +619,9 @@
           </button>
         </div>
 
+        <!-- SCHRITT 2: RAUM AUSWÄHLEN -->
         <div class="setup-box ready-right" id="stepRoomsBox">
-          <h3>Raum wählen</h3>
+          <h3>2. Channel wählen</h3>
           
           <div class="input-group">
             <label style="font-size: 13px; color: var(--topbar-subtext); font-weight: 500;">Eigenen Channel erstellen oder suchen:</label>
@@ -633,6 +646,7 @@
 
       </div>
 
+      <!-- Einstellungen -->
       <div class="settings" id="settings">
         <label style="font-weight: 600;">Minuten:</label>
         <input id="minutesInput" value="18" style="width: 60px; text-align: center;">
@@ -646,8 +660,14 @@
           <input type="checkbox" id="compactMode" onchange="toggleCompactMode()">
           Compact Mode
         </label>
+
+        <!-- RESET ALL BUTTON -->
+        <button onclick="resetAllTimers()" style="margin-left: auto; background: rgba(229,62,62,0.1); border-color: rgba(229,62,62,0.2); color: var(--color-red); padding: 6px 12px; font-size: 12px; font-weight: 700; border-radius: 6px;">
+          ❌ Reset All Timers
+        </button>
       </div>
 
+      <!-- Hauptbereich -->
       <div class="main">
         <div class="timers">
           <div id="list" class="hidden"></div>
@@ -696,46 +716,32 @@
         localStorage.setItem("compactMode", isCompact);
       }
 
-      // INTELIGENTER AUTO-LOGIN BEIM START
+      // AUTO-LOGIN BEIM START
       window.addEventListener('DOMContentLoaded', () => {
         const savedName = localStorage.getItem("savedNickname");
         if (savedName) {
           document.getElementById("username").value = savedName;
-          // Direkt ohne Animation zu Schritt 2 springen
           document.getElementById("stepUsernameBox").className = "setup-box exit-left";
           document.getElementById("stepRoomsBox").className = "setup-box active";
         }
       });
 
-      // --- ANIMATIONS-LOGIK FÜR DIE LOBBY ---
       function submitUsername() {
         const username = document.getElementById("username").value.trim();
         if (!username) {
           showMessage("⚠ Bitte trage zuerst einen Spielernamen ein!");
           return;
         }
-        
-        // Lokaler Speicher füllen
         localStorage.setItem("savedNickname", username);
-        
-        const box1 = document.getElementById("stepUsernameBox");
-        box1.className = "setup-box exit-left";
-        
-        const box2 = document.getElementById("stepRoomsBox");
-        box2.className = "setup-box active";
+        document.getElementById("stepUsernameBox").className = "setup-box exit-left";
+        document.getElementById("stepRoomsBox").className = "setup-box active";
       }
 
       function backToUsername() {
-        // Lokaler Speicher leeren bei bewusster Änderung
         localStorage.removeItem("savedNickname");
-        
-        const box2 = document.getElementById("stepRoomsBox");
-        box2.className = "setup-box ready-right";
-        
-        const box1 = document.getElementById("stepUsernameBox");
-        box1.className = "setup-box active";
+        document.getElementById("stepRoomsBox").className = "setup-box ready-right";
+        document.getElementById("stepUsernameBox").className = "setup-box active";
       }
-
 
       const firebaseConfig = {
         apiKey: "AIzaSyCx52T35a9Jvsrbl51abjdN0hsSxo7z27M",
@@ -800,11 +806,11 @@
         if (speechSynthesis.speaking) speechSynthesis.cancel();
         setTimeout(() => {
           const msg = new SpeechSynthesisUtterance(text);
-          msg.lang = "de-DE";
+          msg.lang = "de-DE"; // Verwendet deutsche Sprache für "CH 1 ready"
           const voices = speechSynthesis.getVoices();
           if (voices.length) msg.voice = voices.find(v => v.lang.includes("de")) || voices[0];
           speechSynthesis.speak(msg);
-        }, 50);
+        }, 10);
       }
 
       function showMessage(msg) {
@@ -858,7 +864,6 @@
         document.getElementById("userList").innerHTML = "";
         document.getElementById("chatBox").innerHTML = "";
         
-        // Zurück zu Schritt 2 springen
         document.getElementById("stepUsernameBox").className = "setup-box exit-left";
         document.getElementById("stepRoomsBox").className = "setup-box active";
         updateUI();
@@ -1052,7 +1057,7 @@ ${d.toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"})} • <span sty
           
           if (!data) {
             el.innerText = "READY"; dot.className = "dot green";
-            card.classList.remove("orangeWarn", "greenWarn");
+            card.classList.remove("orangeWarn", "greenWarn", "overtime-pulse");
             pbar.style.width = "0%";
             lastRemaining[i] = null; continue;
           }
@@ -1061,12 +1066,12 @@ ${d.toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"})} • <span sty
           
           if (remaining > 0) {
             const m = Math.floor(remaining / 60); const s = Math.floor(remaining % 60);
+            
             el.innerText = `${m}:${String(s).padStart(2,"0")}`;
             dot.className = "dot " + (remaining < 60 ? "orange" : "red");
-            card.classList.remove("greenWarn");
+            card.classList.remove("greenWarn", "overtime-pulse");
             card.classList.toggle("orangeWarn", remaining < 60);
             
-            // Progress Berechnung (Füllt sich auf 100% je näher das Ende rückt)
             const pct = ((data.duration - remaining) / data.duration) * 100;
             pbar.style.width = `${pct}%`;
             pbar.style.backgroundColor = remaining < 60 ? "var(--color-orange)" : "var(--color-red)";
@@ -1080,8 +1085,12 @@ ${d.toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"})} • <span sty
             pbar.style.width = "100%";
             pbar.style.backgroundColor = "var(--color-green)";
             
+            if (over > 10) {
+              card.classList.add("overtime-pulse");
+            }
+            
             if (lastRemaining[i] > 0) {
-              speak("C H " + i + " ready");
+              speak("CH " + i + " ready");
               if (navigator.vibrate) navigator.vibrate([300, 100, 300]);
             }
           }
@@ -1099,6 +1108,17 @@ ${d.toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"})} • <span sty
       }
 
       function resetTimer(ch) { db.ref(`rooms/${ROOM}/timers/${ch}`).remove(); }
+
+      function resetAllTimers() {
+        if (!ROOM) return;
+        if (confirm("Möchtest du wirklich ALLE Timer in diesem Raum zurücksetzen?")) {
+          db.ref(`rooms/${ROOM}/timers`).remove().then(() => {
+            showMessage("🔄 Alle Timer wurden zurückgesetzt!");
+          }).catch(err => {
+            showMessage("❌ Fehler beim Zurücksetzen: " + err.message);
+          });
+        }
+      }
       
       updateUI();
     </script>
