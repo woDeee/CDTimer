@@ -533,7 +533,6 @@
 
   <body>
 
-    <!-- Topbar -->
     <div class="topbar">
       <div class="topbar-brand">
         <img src="logo_header.png" alt="Logo" class="topbar-logo">
@@ -553,13 +552,9 @@
       </div>
     </div>
 
-    <!-- SIDEBAR COMPONENT -->
     <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar(false)"></div>
 
-
-
-
-        <div class="sidebar" id="sidebar">
+    <div class="sidebar" id="sidebar">
       <div class="sidebar-header">
         <h2>Handbuch & Legende</h2>
         <button class="close-sidebar-btn" onclick="toggleSidebar(false)">&times;</button>
@@ -604,10 +599,8 @@
 
     <div class="container">
 
-      <!-- Animierter Login- & Raum-Auswahlbereich -->
       <div id="lobbyContainer" class="lobby-wrapper">
         
-        <!-- SCHRITT 1: NICKNAME -->
         <div class="setup-box active" id="stepUsernameBox">
           <h3>1. Profil erstellen</h3>
           <div class="input-group">
@@ -619,7 +612,6 @@
           </button>
         </div>
 
-        <!-- SCHRITT 2: RAUM AUSWÄHLEN -->
         <div class="setup-box ready-right" id="stepRoomsBox">
           <h3>2. Channel wählen</h3>
           
@@ -646,28 +638,28 @@
 
       </div>
 
-      <!-- Einstellungen -->
       <div class="settings" id="settings">
         <label style="font-weight: 600;">Minuten:</label>
         <input id="minutesInput" value="18" style="width: 60px; text-align: center;">
 
-        <label style="display:flex;align-items:center;gap:6px;cursor: pointer; margin-left: 20px; font-weight: 500;">
-          <input type="checkbox" id="muteVoice">
-          Mute Voice
-        </label>
+        <div style="display: flex; align-items: center; gap: 8px; margin-left: 20px;">
+          <label style="display:flex;align-items:center;gap:6px;cursor: pointer; font-weight: 500;">
+            <input type="checkbox" id="muteVoice">
+            Mute Voice
+          </label>
+          <button onclick="testAudio()" style="padding: 4px 8px; font-size: 11px; font-weight: 700; border-radius: 4px; height: auto;">🔊 Test</button>
+        </div>
 
         <label style="display:flex;align-items:center;gap:6px;cursor: pointer; margin-left: 20px; font-weight: 600; color: var(--primary-color);">
           <input type="checkbox" id="compactMode" onchange="toggleCompactMode()">
           Compact Mode
         </label>
 
-        <!-- RESET ALL BUTTON -->
         <button onclick="resetAllTimers()" style="margin-left: auto; background: rgba(229,62,62,0.1); border-color: rgba(229,62,62,0.2); color: var(--color-red); padding: 6px 12px; font-size: 12px; font-weight: 700; border-radius: 6px;">
           ❌ Reset All Timers
         </button>
       </div>
 
-      <!-- Hauptbereich -->
       <div class="main">
         <div class="timers">
           <div id="list" class="hidden"></div>
@@ -694,6 +686,9 @@
     <div id="toast"></div>
 
     <script>
+      // DOM Cache für ultra-schnelle Updates ohne ständige Suchanfragen
+      let domCache = {};
+
       // Theme Logik laden
       const currentTheme = localStorage.getItem("theme") || "light";
       document.documentElement.setAttribute("data-theme", currentTheme);
@@ -765,6 +760,7 @@
       let ROOM = null;
       let timersData = {};
       let lastRemaining = {};
+      let domStates = {}; // Speichert den letzten gerenderten Zustand der UI-Karten
       let roomRef = null;
       let chatRef = null;
       let usersRef = null;
@@ -801,16 +797,25 @@
         }
       }
 
+      // Optimierte Audio-Queue-Logik gegen "Verschlucken"
       function speak(text) {
         if (document.getElementById("muteVoice").checked) return;
+        
+        // speechSynthesis.cancel() bricht radikal ab, fängt aber Hänger ab
         if (speechSynthesis.speaking) speechSynthesis.cancel();
+        
+        // Kurzer Timeout entlastet die Browser-Audio-Engine
         setTimeout(() => {
           const msg = new SpeechSynthesisUtterance(text);
-          msg.lang = "de-DE"; // Verwendet deutsche Sprache für "CH 1 ready"
+          msg.lang = "de-DE";
           const voices = speechSynthesis.getVoices();
           if (voices.length) msg.voice = voices.find(v => v.lang.includes("de")) || voices[0];
           speechSynthesis.speak(msg);
-        }, 10);
+        }, 30);
+      }
+
+      function testAudio() {
+        speak("Audio Test erfolgreich.");
       }
 
       function showMessage(msg) {
@@ -822,6 +827,12 @@
 
       function setRoom(r) {
         ROOM = r;
+        // Vorheriges lokales Backup laden, falls vorhanden (Überbrückungsschutz)
+        const localBackup = localStorage.getItem(`backup_timers_${ROOM}`);
+        if (localBackup && Object.keys(timersData).length === 0) {
+          try { timersData = JSON.parse(localBackup); } catch(e){}
+        }
+
         document.getElementById("list").classList.remove("hidden");
         document.getElementById("settings").classList.add("active");
         document.getElementById("usersBox").classList.add("active");
@@ -857,7 +868,7 @@
         if (usersRef) usersRef.off();
         roomRef = chatRef = usersRef = null;
         speechSynthesis.cancel();
-        ROOM = null; timersData = {}; lastRemaining = {};
+        ROOM = null; timersData = {}; lastRemaining = {}; domStates = {};
         document.getElementById("list").classList.add("hidden");
         document.getElementById("settings").classList.remove("active");
         document.getElementById("usersBox").classList.remove("active");
@@ -1023,7 +1034,12 @@ ${d.toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"})} • <span sty
       function listenRoom() {
         if (roomRef) roomRef.off();
         roomRef = db.ref(`rooms/${ROOM}/timers`);
-        roomRef.on("value", snap => { timersData = snap.val() || {}; renderAll(); });
+        roomRef.on("value", snap => { 
+          timersData = snap.val() || {}; 
+          // Lokales Ausfall-Backup wegschreiben
+          if (ROOM) localStorage.setItem(`backup_timers_${ROOM}`, JSON.stringify(timersData));
+          renderAll(); 
+        });
       }
       
       setInterval(renderAll, 1000);
@@ -1047,46 +1063,80 @@ ${d.toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"})} • <span sty
 </div>`;
       }
 
+      // Initialisiert den DOM Cache für die Elemente der Cards
+      for (let i = 1; i <= 8; i++) {
+        domCache[i] = {
+          text: document.getElementById("t" + i),
+          card: document.getElementById("card" + i),
+          dot: document.getElementById("dot" + i),
+          pbar: document.getElementById("pbar" + i)
+        };
+        domStates[i] = {};
+      }
+
       function renderAll() {
         for (let i = 1; i <= 8; i++) {
-          const el = document.getElementById("t" + i);
-          const card = document.getElementById("card" + i);
-          const dot = document.getElementById("dot" + i);
-          const pbar = document.getElementById("pbar" + i);
+          const cache = domCache[i];
           const data = timersData[i];
+          const state = domStates[i];
           
           if (!data) {
-            el.innerText = "READY"; dot.className = "dot green";
-            card.classList.remove("orangeWarn", "greenWarn", "overtime-pulse");
-            pbar.style.width = "0%";
-            lastRemaining[i] = null; continue;
+            if (state.status !== "READY") {
+              cache.text.innerText = "READY";
+              cache.dot.className = "dot green";
+              cache.card.className = "hud-card";
+              cache.pbar.style.width = "0%";
+              state.status = "READY";
+            }
+            lastRemaining[i] = null; 
+            continue;
           }
           
           const remaining = data.duration - ((Date.now() - data.startTime) / 1000);
           
           if (remaining > 0) {
-            const m = Math.floor(remaining / 60); const s = Math.floor(remaining % 60);
+            const m = Math.floor(remaining / 60); 
+            const s = Math.floor(remaining % 60);
+            const timeText = `${m}:${String(s).padStart(2,"0")}`;
+            const isCritical = remaining < 60;
             
-            el.innerText = `${m}:${String(s).padStart(2,"0")}`;
-            dot.className = "dot " + (remaining < 60 ? "orange" : "red");
-            card.classList.remove("greenWarn", "overtime-pulse");
-            card.classList.toggle("orangeWarn", remaining < 60);
+            // Text nur bei Änderung aktualisieren
+            if (state.text !== timeText) {
+              cache.text.innerText = timeText;
+              state.text = timeText;
+            }
             
-            const pct = ((data.duration - remaining) / data.duration) * 100;
-            pbar.style.width = `${pct}%`;
-            pbar.style.backgroundColor = remaining < 60 ? "var(--color-orange)" : "var(--color-red)";
+            // Status/Klassenwechsel filtern (Performance)
+            const targetStatus = isCritical ? "CRITICAL" : "RUNNING";
+            if (state.status !== targetStatus) {
+              cache.dot.className = isCritical ? "dot orange" : "dot red";
+              cache.card.className = isCritical ? "hud-card orangeWarn" : "hud-card";
+              cache.pbar.style.backgroundColor = isCritical ? "var(--color-orange)" : "var(--color-red)";
+              state.status = targetStatus;
+            }
+            
+            const pct = Math.min(((data.duration - remaining) / data.duration) * 100, 100);
+            cache.pbar.style.width = `${pct}%`;
+            
           } else {
-            const over = Math.abs(remaining); const m = Math.floor(over / 60); const s = Math.floor(over % 60);
-            el.innerText = `+${m}:${String(s).padStart(2,"0")}`;
-            dot.className = "dot green"; 
-            card.classList.remove("orangeWarn"); 
-            card.classList.add("greenWarn");
+            const over = Math.abs(remaining); 
+            const m = Math.floor(over / 60); 
+            const s = Math.floor(over % 60);
+            const timeText = `+${m}:${String(s).padStart(2,"0")}`;
+            const isOverTen = over > 10;
             
-            pbar.style.width = "100%";
-            pbar.style.backgroundColor = "var(--color-green)";
+            if (state.text !== timeText) {
+              cache.text.innerText = timeText;
+              state.text = timeText;
+            }
             
-            if (over > 10) {
-              card.classList.add("overtime-pulse");
+            const targetStatus = isOverTen ? "OVERTIME_PULSE" : "OVERTIME";
+            if (state.status !== targetStatus) {
+              cache.dot.className = "dot green";
+              cache.card.className = isOverTen ? "hud-card greenWarn overtime-pulse" : "hud-card greenWarn";
+              cache.pbar.style.width = "100%";
+              cache.pbar.style.backgroundColor = "var(--color-green)";
+              state.status = targetStatus;
             }
             
             if (lastRemaining[i] > 0) {
@@ -1101,9 +1151,10 @@ ${d.toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"})} • <span sty
       function parseMinutes(v) { return Math.floor(parseFloat(v.replace(",", ".")) * 60); }
 
       function start(ch) {
+        const durationSec = parseMinutes(document.getElementById("minutesInput").value);
         db.ref(`rooms/${ROOM}/timers/${ch}`).set({
           startTime: Date.now(),
-          duration: parseMinutes(document.getElementById("minutesInput").value)
+          duration: durationSec
         });
       }
 
