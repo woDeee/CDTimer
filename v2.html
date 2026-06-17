@@ -660,6 +660,11 @@
           <div class="session-stat">⏱ Run: <span id="sessionTimeDisplay">00:00:00</span></div>
           <div class="session-stat">⚔ Session Gesamt: <span id="sessionCountDisplay" style="color:var(--primary-color); font-weight:700;">0</span></div>
           <div class="session-stat">📈 <span id="sessionRpmDisplay">0.0</span>/h</div>
+		  
+		  
+		  <button id="sessionBtn" onclick="exportSessionToCSV()" style="background: var(--primary-color); color:#fff; border-color:var(--primary-color); padding:6px 12px; font-size:12px;">
+            📥 Exportieren (.CSV)
+          </button>
         </div>
       </div>
 
@@ -1148,6 +1153,65 @@
           for(let i = 1; i <= 8; i++) resetTimer(i);
           showMessage("🔄 Alle Timer zurückgesetzt!");
         }
+      }
+	  
+	  function exportSessionToCSV() {
+        if (!ROOM) { showMessage("⚠ Keine aktive Verbindung zu einem Raum!"); return; }
+
+        // 1. Zeitberechnung (analog zur UI-Uhr)
+        let elapsedMs = 0;
+        if (sessionData.running && sessionData.startTime > 0) {
+          elapsedMs = Date.now() - sessionData.startTime;
+        } else if (sessionData.elapsedTime) {
+          elapsedMs = sessionData.elapsedTime;
+        }
+        
+        const totalSecs = Math.floor(elapsedMs / 1000);
+        const h = Math.floor(totalSecs / 3600);
+        const m = Math.floor((totalSecs % 3600) / 60);
+        const s = totalSecs % 60;
+        const durationText = `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`;
+        
+        const totalHours = totalSecs / 3600;
+        const totalKills = sessionData.count || 0;
+        const killsPerHour = totalHours > 0 ? (totalKills / totalHours).toFixed(1) : "0.0";
+
+        // 2. CSV-Inhalt aufbauen (mit Semikolon für deutschen Excel-Standard)
+        let csvContent = "\ufeff"; // UTF-8 BOM für korrekte Umlaute in Excel
+        csvContent += `Metin2 Farm-Session Export;; Raum: ${ROOM}\n`;
+        csvContent += `Datum: ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}\n\n`;
+        
+        // Block 1: Gesamtdaten
+        csvContent += "Metrik;Wert\n";
+        csvContent += `Session-Dauer;${durationText}\n`;
+        csvContent += `Metins Gesamt;${totalKills}\n`;
+        csvContent += `Metins pro Stunde;${killsPerHour}\n\n`;
+        
+        // Block 2: Channel-Aufschlüsselung
+        csvContent += "Channel;Kills\n";
+        for (let i = 1; i <= 8; i++) {
+          const chData = timersData[i] || {};
+          const chKills = chData.killCount || 0;
+          const chNote = chData.note || "";
+          csvContent += `CH${i};${chKills}\n`;
+        }
+
+        // 3. Download-Trigger im Browser
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        
+        // Dateiname z.B.: "SpawnPulse_Export_Orctal_Schatten_1.csv"
+        const cleanRoomName = ROOM.replace(/[^a-zA-Z0-9]/g, "_");
+        link.setAttribute("href", url);
+        link.setAttribute("download", `SpawnPulse_Export_${cleanRoomName}.csv`);
+        link.style.visibility = 'hidden';
+        
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        showMessage("💾 CSV-Export erfolgreich!");
       }
     </script>
   </body>
