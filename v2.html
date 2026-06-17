@@ -5,13 +5,35 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
-    <title>SpawnPulse - Metin2 CD Timer</title>
+    <title>SpawnPulse - Metin2 CD Timer & Tracker</title>
 
     <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-database-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
 
     <style>
+      /* --- GLOBALER SYNCHRONISATIONS-TAKTMESSER (CSS API) --- */
+      @property --sync-orange-border {
+        syntax: '<number>';
+        inherits: true;
+        initial-value: 1;
+      }
+      @property --sync-orange-border {
+        syntax: '<color>';
+        inherits: true;
+        initial-value: transparent;
+      }
+      @property --sync-green-border {
+        syntax: '<color>';
+        inherits: true;
+        initial-value: transparent;
+      }
+      @property --sync-orange-glow {
+        syntax: '<color>';
+        inherits: true;
+        initial-value: transparent;
+      }
+
       /* --- VARIABLEN FÜR THEME-SWITCHER --- */
       :root {
         --bg-color: #f4f6f8;
@@ -38,6 +60,10 @@
         --card-glow-red: none;
         --card-glow-orange: none;
         --progress-bg: #edf2f7;
+        
+        --glow-color: transparent;
+
+        animation: globalBlinkAnim 0.8s infinite steps(1);
       }
 
       [data-theme="dark"] {
@@ -62,9 +88,24 @@
         --color-green: #00ff88;
         --color-red: #ff4040;
         --color-orange: #ff9f1a;
-        --card-glow-red: 0 0 15px rgba(255, 64, 64, 0.2);
+        --card-glow-red: 0 0 15px rgba(255, 64, 64, 0.15);
         --card-glow-orange: 0 0 20px rgba(255, 159, 26, 0.35);
         --progress-bg: #1a1a1a;
+        
+        --glow-color: rgba(255, 159, 26, 0.35);
+      }
+
+      @keyframes globalBlinkAnim {
+        0%, 100% {
+          --sync-orange-border: var(--color-orange);
+          --sync-orange-glow: var(--glow-color);
+          --sync-green-border: var(--color-green);
+        }
+        50% {
+          --sync-orange-border: transparent;
+          --sync-orange-glow: transparent;
+          --sync-green-border: transparent;
+        }
       }
 
       body {
@@ -75,8 +116,6 @@
         padding-bottom: 20px;
         transition: background 0.3s, color 0.3s;
         overflow-x: hidden;
-
-        /* BLOCKIERT JEGLICHE TEXTMARKIERUNG */
         -webkit-user-select: none;
         -moz-user-select: none;
         -ms-user-select: none;
@@ -90,7 +129,6 @@
         user-select: text;
       }
 
-      /* SCROLLBALKEN ANPASSUNG */
       #userList::-webkit-scrollbar,
       #chatBox::-webkit-scrollbar,
       #roomListBox::-webkit-scrollbar,
@@ -120,7 +158,6 @@
         scrollbar-color: var(--scrollbar-thumb) var(--bg-color);
       }
 
-      /* Topbar */
       .topbar {
         display: flex;
         justify-content: space-between;
@@ -196,7 +233,6 @@
 
       .hidden { display: none !important; }
 
-      /* --- LOBBY SYSTEM --- */
       .lobby-wrapper {
         position: relative;
         width: 100%;
@@ -267,20 +303,39 @@
 
       @media (min-width: 768px) { .main { flex-direction: row; } }
 
-      .settings {
+      .panel-row {
         display: none;
-        justify-content: center;
-        align-items: center;
-        flex-wrap: wrap;
+        flex-direction: column;
         gap: 12px;
         margin: 15px 0;
-        padding: 12px;
+      }
+      @media(min-width: 768px) {
+        .panel-row { flex-direction: row; }
+      }
+      .panel-row.active { display: flex; }
+
+      .settings, .session-panel {
         background: var(--card-bg);
         border: 1px solid var(--border-color);
         border-radius: 10px;
+        padding: 12px 16px;
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 12px;
+        box-sizing: border-box;
       }
+      .settings { flex: 1; }
+      .session-panel { flex: 1.2; border-left: 4px solid var(--primary-color); }
 
-      .settings.active { display: flex; }
+      .session-stat {
+        font-size: 13px;
+        font-weight: 500;
+        background: var(--chat-bg);
+        padding: 6px 10px;
+        border-radius: 6px;
+        border: 1px solid var(--border-color);
+      }
 
       .timers { flex: 2; width: 100%; }
 
@@ -294,9 +349,8 @@
         display: none;
         flex-direction: column;
         box-sizing: border-box;
-        height: 540px;
+        height: 580px;
         box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
-        transition: height 0.2s ease;
       }
 
       .usersPanel.active { display: flex; }
@@ -336,7 +390,6 @@
       .chatInputRow input { flex: 1; }
       .chatInputRow button { width: 80px; }
 
-      /* --- HUD CARDS & ALARME --- */
       .hud-card {
         background: var(--card-bg);
         border: 1px solid var(--border-color);
@@ -359,9 +412,9 @@
         box-shadow: 0 4px 6px rgba(0,0,0,0.04);
       }
 
-      @media (min-width: 480px) {
-        .hud-card { grid-template-columns: 60px 1fr 140px; text-align: left; }
-        .center { display: flex; gap: 4px; justify-content: center; flex-direction: column; }
+      @media (min-width: 580px) {
+        .hud-card { grid-template-columns: 100px 1.2fr 1.2fr 120px; text-align: left; }
+        .center { display: flex; gap: 6px; justify-content: center; flex-direction: column; }
         .right { justify-content: flex-end; }
       }
 
@@ -371,11 +424,40 @@
       .card-user-tag {
         font-size: 11px;
         color: var(--topbar-subtext);
-        text-align: center;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
-        max-width: 130px;
+        max-width: 140px;
+      }
+
+      .ch-note-input {
+        padding: 6px 10px;
+        font-size: 12px;
+        border-radius: 6px;
+        border: 1px solid var(--border-color);
+        background: var(--chat-bg);
+        color: var(--text-color);
+        width: 100%;
+        box-sizing: border-box;
+      }
+      .ch-note-input:placeholder-shown { font-style: italic; opacity: 0.7; }
+
+      .kill-counter-badge {
+        font-size: 11px;
+        font-weight: 700;
+        background: var(--button-bg);
+        color: var(--text-color);
+        border: 1px solid var(--border-color);
+        padding: 2px 6px;
+        border-radius: 4px;
+        margin-left: 5px;
+        display: inline-block;
+        vertical-align: middle;
+      }
+      [data-theme="dark"] .kill-counter-badge {
+        background: #1a1a1a;
+        border-color: #333;
+        color: #00ff88;
       }
 
       .dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
@@ -383,185 +465,78 @@
       .red { background: var(--color-red); }
       .orange { background: var(--color-orange); }
 
-      .hud-card.timer-running {
-        box-shadow: var(--card-glow-red);
+      .hud-card.timer-running { 
+        border: 2px solid var(--color-red) !important; 
+        padding: 15px; 
+        box-shadow: var(--card-glow-red); 
+      }
+      
+      .orangeWarn { 
+        border: 2px solid var(--sync-orange-border) !important; 
+        padding: 15px; 
+        background: var(--orange-warn-bg) !important; 
+        box-shadow: 0 0 20px var(--sync-orange-glow) !important; 
+      }
+      
+      .greenWarn { 
+        border: 2px solid var(--color-green) !important; 
+        padding: 15px; 
+        background: var(--green-warn-bg) !important; 
       }
 
-      .orangeWarn {
-        border: 2px solid var(--color-orange) !important;
-        background: var(--orange-warn-bg) !important;
-        box-shadow: var(--card-glow-orange) !important;
-        animation: blink .8s infinite;
-      }
+      .progress-container { position: absolute; bottom: 0; left: 0; width: 100%; height: 4px; background: var(--progress-bg); }
+      .progress-bar { height: 100%; width: 0%; background: var(--color-green); transition: width 1s linear, background-color 0.3s ease; }
 
-      .greenWarn {
-        border: 2px solid var(--color-green) !important;
-        background: var(--green-warn-bg) !important;
-        animation: greenBlink .8s infinite;
-      }
-
-      .overtime-pulse {
-        animation: overBlink 1.5s infinite ease-in-out;
-      }
-
-      @keyframes blink { 50% { border-color: transparent; box-shadow: none !important; } }
-      @keyframes greenBlink { 50% { border-color: transparent; } }
-      @keyframes overBlink { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
-
-      .progress-container {
-        position: absolute;
-        bottom: 0;
-        left: 0;
-        width: 100%;
-        height: 4px;
-        background: var(--progress-bg);
-      }
-
-      .progress-bar {
-        height: 100%;
-        width: 0%;
-        background: var(--color-green);
-        transition: width 1s linear, background-color 0.3s ease;
-      }
-
-      /* --- COMPACT MODE LAYOUT MIT TEXT-BUTTONS --- */
-      body.compact .container { max-width: 900px; }
+      body.compact .container { max-width: 950px; }
       body.compact .hud-card {
         padding: 6px 14px;
         margin-bottom: 6px;
         border-radius: 8px;
         font-size: 13px;
-        grid-template-columns: 50px 1fr 130px;
+        grid-template-columns: 90px 1.4fr 1.2fr 100px;
       }
-      body.compact .center { flex-direction: row; align-items: center; justify-content: flex-start; gap: 8px; }
+      body.compact .hud-card.timer-running,
+      body.compact .orangeWarn,
+      body.compact .greenWarn {
+        padding: 5px 13px;
+      }
+      body.compact .center { flex-direction: row; align-items: center; justify-content: flex-start; gap: 6px; }
       body.compact .card-user-tag { text-align: left; max-width: 80px; }
-      
-      /* Buttons bleiben eckig mit Text, werden nur kompakter formatiert */
-      body.compact .hud-card button { 
-        padding: 4px 8px; 
-        font-size: 11px; 
-        border-radius: 6px; 
-        width: auto; 
-        height: auto; 
-        display: inline-block;
-        line-height: 1.2;
-      }
-      body.compact .usersPanel { height: 420px; }
+      body.compact .ch-note-input { padding: 4px 6px; font-size: 11px; border-radius: 4px; }
+      body.compact .hud-card button { padding: 4px 6px; font-size: 11px; border-radius: 4px; }
+      body.compact .usersPanel { height: 450px; }
 
-      #toast {
-        position: fixed;
-        bottom: 30px;
-        left: 50%;
-        transform: translateX(-50%);
-        background: #2d3748;
-        color: #ffffff;
-        padding: 12px 24px;
-        border-radius: 30px;
-        font-size: 14px;
-        font-weight: 500;
-        display: none;
-        z-index: 9999;
-        text-align: center;
-      }
+      #toast { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); background: #2d3748; color: #ffffff; padding: 12px 24px; border-radius: 30px; font-size: 14px; font-weight: 500; display: none; z-index: 9999; text-align: center; }
+      .room-item { display: flex; justify-content: space-between; align-items: center; padding: 12px; margin-bottom: 8px; background: var(--chat-bg); border: 1px solid var(--border-color); border-radius: 8px; gap: 10px; }
+      #roomListBox { background: var(--card-bg); border: 1px solid var(--border-color); padding: 10px; border-radius: 8px; width: 100%; max-height: 220px; overflow: auto; box-sizing: border-box; }
+      .control-btn { background: var(--button-bg); border: 1px solid var(--border-color); color: var(--text-color); border-radius: 50%; width: 36px; height: 36px; padding: 0; display: flex; align-items: center; justify-content: center; font-size: 18px; transition: all 0.2s ease; }
+      .control-btn:hover { background: var(--button-hover); transform: scale(1.05); }
 
-      .room-item {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 12px;
-        margin-bottom: 8px;
-        background: var(--chat-bg);
-        border: 1px solid var(--border-color);
-        border-radius: 8px;
-        gap: 10px;
-      }
-
-      #roomListBox {
-        background: var(--card-bg);
-        border: 1px solid var(--border-color);
-        padding: 10px;
-        border-radius: 8px;
-        width: 100%;
-        max-height: 220px;
-        overflow: auto;
-        box-sizing: border-box;
-      }
-
-      .control-btn {
-        background: var(--button-bg);
-        border: 1px solid var(--border-color);
-        color: var(--text-color);
-        border-radius: 50%;
-        width: 36px;
-        height: 36px;
-        padding: 0;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 18px;
-        transition: all 0.2s ease;
-      }
-
-      .control-btn:hover {
-        background: var(--button-hover);
-        transform: scale(1.05);
-      }
-
-      /* SIDEBAR */
-      .sidebar-overlay {
-        position: fixed;
-        top: 0; left: 0; width: 100%; height: 100%;
-        background: rgba(0, 0, 0, 0.4);
-        z-index: 10000; display: none; opacity: 0;
-        transition: opacity 0.3s ease;
-      }
+      .sidebar-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.4); z-index: 10000; display: none; opacity: 0; transition: opacity 0.3s ease; }
       .sidebar-overlay.active { display: block; opacity: 1; }
-
-      .sidebar {
-        position: fixed;
-        top: 0; right: -400px; width: 100%; max-width: 380px; height: 100%;
-        background: var(--card-bg);
-        border-left: 1px solid var(--border-color);
-        box-shadow: -10px 0 30px rgba(0,0,0,0.05);
-        z-index: 10001; transition: right 0.3s ease;
-        display: flex; flex-direction: column; box-sizing: border-box;
-      }
+      .sidebar { position: fixed; top: 0; right: -400px; width: 100%; max-width: 380px; height: 100%; background: var(--card-bg); border-left: 1px solid var(--border-color); box-shadow: -10px 0 30px rgba(0,0,0,0.05); z-index: 10001; transition: right 0.3s ease; display: flex; flex-direction: column; box-sizing: border-box; }
       .sidebar.active { right: 0; }
-
-      .sidebar-header {
-        padding: 20px; border-bottom: 1px solid var(--border-color);
-        display: flex; justify-content: space-between; align-items: center;
-      }
+      .sidebar-header { padding: 20px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; }
       .sidebar-header h2 { margin: 0; font-size: 18px; color: var(--panel-title-color); }
-
-      .close-sidebar-btn {
-        background: none; border: none; color: var(--topbar-subtext);
-        font-size: 24px; cursor: pointer; padding: 0; line-height: 1;
-      }
-
+      .close-sidebar-btn { background: none; border: none; color: var(--topbar-subtext); font-size: 24px; cursor: pointer; padding: 0; line-height: 1; }
       .sidebar-content { padding: 20px; overflow-y: auto; flex: 1; }
       .info-section { margin-bottom: 25px; }
-      .info-section h4 {
-        margin-top: 0; margin-bottom: 12px; color: var(--topbar-subtext);
-        font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px;
-        border-bottom: 1px solid var(--border-color); padding-bottom: 6px;
-      }
-
+      .info-section h4 { margin-top: 0; margin-bottom: 12px; color: var(--topbar-subtext); font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid var(--border-color); padding-bottom: 6px; }
       .guide-list { padding-left: 20px; margin: 0; }
       .guide-list li { margin-bottom: 10px; font-size: 13px; color: var(--text-color); line-height: 1.5; }
-
-      .legend-item { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 14px; font-size: 13px; line-height: 1.4; }
-      .legend-item .dot { margin-top: 3px; }
-      .legend-box-preview { width: 45px; height: 22px; border-radius: 4px; flex-shrink: 0; background: var(--chat-bg); border: 1px solid var(--border-color); }
+      
+      .legend-item { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; font-size: 13px; }
+      .legend-color-box { width: 16px; height: 16px; border-radius: 4px; border: 1px solid var(--border-color); flex-shrink: 0; }
     </style>
   </head>
 
   <body>
 
+    <!-- Topbar -->
     <div class="topbar">
       <div class="topbar-brand">
         <img src="logo_header.png" alt="Logo" class="topbar-logo">
-        <strong>SpawnPulse - Metin2 CD Timer</strong>
+        <strong>SpawnPulse - Metin2 CD Timer & Tracker</strong>
       </div>
       <div class="topbar-right">
         <div>
@@ -577,8 +552,8 @@
       </div>
     </div>
 
+    <!-- SIDEBAR -->
     <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar(false)"></div>
-
     <div class="sidebar" id="sidebar">
       <div class="sidebar-header">
         <h2>Handbuch & Legende</h2>
@@ -586,47 +561,40 @@
       </div>
       <div class="sidebar-content">
         <div class="info-section">
-          <h4>Bedienungsanleitung</h4>
+          <h4>⚔ Bedienung & Ablauf</h4>
           <ol class="guide-list">
-            <li><strong>Namen auswählen</strong> Trage deinen Nickname ein. Dieser wird lokal im Browser gesichert. Bei zukünftigen Besuchen wird dieser Schritt automatisch übersprungen und du gelangst direkt in die Raumauswahl!</li>
-            <li>Wähle einen Raum aus der Liste oder erstelle einen eigenen via Textfeld.</li>
-            <li>Stelle oben die gewünschte <strong>Minutenanzahl</strong> ein.</li>
-            <li>Klicke auf <strong>Start</strong> bei dem jeweiligen CH, um den Cooldown zu aktivieren. Ein Fortschrittsbalken am unteren Kartenrand visualisiert die Restzeit.</li>
-            <li><strong>Tastatur-Hotkeys (Numpad):</strong> Wenn du in einem Raum bist, kannst du die Tasten <code>1</code> bis <code>8</code> auf deinem Nummernblock nutzen, um den Timer des jeweiligen Kanals blitzschnell zu starten!</li>
-            <li><strong>Compact Mode:</strong> Aktiviere den Modus in den Einstellungen, um Platz zu sparen, falls das HUD auf einem Nebenbildschirm läuft.</li>
+            <li><strong>Killed:</strong> Startet den Cooldown, erhöht deinen Channel-Zähler um 1 und den Session-Gesamtzähler um 1.</li>
+            <li><strong>Start:</strong> Startet den reinen Cooldown-Timer (Zähler bleiben unberührt).</li>
+            <li><strong>Reset:</strong> Setzt den Timer einer Karte sofort wieder auf "READY". Notizen und Kills bleiben gespeichert.</li>
+            <li><strong>Hotkeys (1-8 / Numpad 1-8):</strong> Triggert sofort die <strong>'Killed'</strong>-Funktion für CH1 bis CH8 (erhöht auch den Zähler!).</li>
           </ol>
         </div>
 
         <div class="info-section">
-          <h4>Farb- & Statuslegende</h4>
-          <div class="legend-item">
-            <div class="dot green"></div>
-            <div><strong>Bereit (READY)</strong><br><span style="color: var(--topbar-subtext);">Es läuft kein Timer. Der Spawn steht offen.</span></div>
-          </div>
-          <div class="legend-item">
-            <div class="dot red"></div>
-            <div><strong>Gesperrt (Laufzeit)</strong><br><span style="color: var(--topbar-subtext);">Der Cooldown läuft. Restzeit liegt über einer Minute.</span></div>
-          </div>
-          <div class="legend-item">
-            <div class="dot orange"></div>
-            <div><strong>Kritische Phase (&lt; 1 Min.)</strong><br><span style="color: var(--topbar-subtext);">Weniger als 60 Sekunden verbleibend.</span></div>
-          </div>
-          <div class="legend-item">
-            <div class="legend-box-preview orangeWarn"></div>
-            <div><strong>Blinkender Oranger Rahmen + Glow</strong><br><span style="color: var(--topbar-subtext);">Visueller Alarm: Im Dunkelmodus pulsiert die Karte zusätzlich intensiv.</span></div>
-          </div>
-          <div class="legend-item">
-            <div class="legend-box-preview greenWarn"></div>
-            <div><strong>Blinkender Grüner Rahmen (+ Zeit)</strong><br><span style="color: var(--topbar-subtext);">Der Cooldown ist abgelaufen!</span></div>
-          </div>
+          <h4>💡 Symbole & UI-Elemente</h4>
+          <div class="legend-item"><span>⭐</span> <span><strong>Festgelegte Räume:</strong> Globale, permanente Server-Räume.</span></div>
+          <div class="legend-item"><span>🕒</span> <span><strong>Temporäre Räume:</strong> Custom-Räume, die sich bei Inaktivität löschen.</span></div>
+          <div class="legend-item"><span>👥</span> <span>Anzahl der Spieler online im Raum.</span></div>
+          <div class="legend-item"><span>👤</span> <span>Zeigt an, wer den Timer gestartet hat.</span></div>
+          <div class="legend-item"><span>⚔ N</span> <span><strong>Channel-Zähler:</strong> Deine Kills in diesem Channel.</span></div>
+          <div class="legend-item"><span>⏱ Run</span> <span>Gesamte aktive Laufzeit der Farmsession.</span></div>
+          <div class="legend-item"><span>📈 N/h</span> <span>Hochgerechnete Kills pro Stunde.</span></div>
+        </div>
+
+        <div class="info-section">
+          <h4>🎨 Timer-Zustände & Farben</h4>
+          <div class="legend-item"><div class="legend-color-box" style="background: var(--color-green);"></div><span><strong>READY:</strong> Channel ist frei.</span></div>
+          <div class="legend-item"><div class="legend-color-box" style="background: var(--color-red);"></div><span><strong>RUNNING:</strong> Cooldown läuft aktiv.</span></div>
+          <div class="legend-item"><div class="legend-color-box" style="background: #ff9f1a;"></div><span><strong>CRITICAL:</strong> Unter 60 Sek. Restzeit (Blinkt synchron).</span></div>
+          <div class="legend-item"><div class="legend-color-box" style="background: var(--color-green); border: 2px solid var(--color-green);"></div><span><strong>OVERTIME:</strong> Abgelaufen. Zeigt Verspätung (Stabiler grüner Rahmen).</span></div>
         </div>
       </div>
     </div>
 
     <div class="container">
 
+      <!-- LOBBY SYSTEM -->
       <div id="lobbyContainer" class="lobby-wrapper">
-        
         <div class="setup-box active" id="stepUsernameBox">
           <h3>1. Profil erstellen</h3>
           <div class="input-group">
@@ -640,7 +608,6 @@
 
         <div class="setup-box ready-right" id="stepRoomsBox">
           <h3>2. Channel wählen</h3>
-          
           <div class="input-group">
             <label style="font-size: 13px; color: var(--topbar-subtext); font-weight: 500;">Eigenen Channel erstellen oder suchen:</label>
             <div class="input-row">
@@ -649,43 +616,54 @@
               <button onclick="createRoom()" style="background: var(--primary-color); color: #ffffff; border-color: var(--primary-color);">Create</button>
             </div>
           </div>
-
           <div style="margin-top: 15px;">
             <strong style="font-size: 14px; display: block; margin-bottom: 10px; color: var(--text-color);">Verfügbare Räume:</strong>
             <div id="roomListBox">
               <div id="roomList"></div>
             </div>
           </div>
-          
           <button onclick="backToUsername()" style="width: 100%; margin-top: 15px; background: transparent; border: none; color: var(--topbar-subtext); font-size: 13px; font-weight: 500;">
             ← Name ändern
           </button>
         </div>
-
       </div>
 
-      <div class="settings" id="settings">
-        <label style="font-weight: 600;">Minuten:</label>
-        <input id="minutesInput" value="18" style="width: 60px; text-align: center;">
+      <!-- DASHBOARD ZEILE -->
+      <div class="panel-row" id="panelRow">
+        <div class="settings">
+          <label style="font-weight: 600; font-size:13px;">Minuten:</label>
+          <input id="minutesInput" value="18" style="width: 55px; text-align: center; padding:6px;">
 
-        <div style="display: flex; align-items: center; gap: 8px; margin-left: 20px;">
-          <label style="display:flex;align-items:center;gap:6px;cursor: pointer; font-weight: 500;">
-            <input type="checkbox" id="muteVoice">
-            Mute Voice
+          <div style="display: flex; align-items: center; gap: 4px;">
+            <label style="display:flex;align-items:center;gap:4px;cursor: pointer; font-size:12px;">
+              <input type="checkbox" id="muteVoice"> Mute
+            </label>
+          </div>
+
+          <label style="display:flex;align-items:center;gap:4px;cursor: pointer; font-size:12px; color: var(--primary-color); font-weight:600;">
+            <input type="checkbox" id="compactMode" onchange="toggleCompactMode()"> Compact
           </label>
-          <button onclick="testAudio()" style="padding: 4px 8px; font-size: 11px; font-weight: 700; border-radius: 4px; height: auto;">🔊 Test</button>
+          
+          <button onclick="resetAllTimers()" style="background: rgba(229,62,62,0.1); border-color: rgba(229,62,62,0.2); color: var(--color-red); padding: 5px 8px; font-size: 11px;">
+            ❌ Reset Timers
+          </button>
         </div>
 
-        <label style="display:flex;align-items:center;gap:6px;cursor: pointer; margin-left: 20px; font-weight: 600; color: var(--primary-color);">
-          <input type="checkbox" id="compactMode" onchange="toggleCompactMode()">
-          Compact Mode
-        </label>
-
-        <button onclick="resetAllTimers()" style="margin-left: auto; background: rgba(229,62,62,0.1); border-color: rgba(229,62,62,0.2); color: var(--color-red); padding: 6px 12px; font-size: 12px; font-weight: 700; border-radius: 6px;">
-          ❌ Reset All Timers
-        </button>
+        <div class="session-panel">
+          <button id="sessionBtn" onclick="toggleSession()" style="background: var(--primary-color); color:#fff; border-color:var(--primary-color); padding:6px 12px; font-size:12px;">
+            ▶ Start Session
+          </button>
+          <button onclick="resetSession()" style="padding:6px 10px; font-size:12px;">
+            🔄 Reset Stats
+          </button>
+          
+          <div class="session-stat">⏱ Run: <span id="sessionTimeDisplay">00:00:00</span></div>
+          <div class="session-stat">⚔ Session Gesamt: <span id="sessionCountDisplay" style="color:var(--primary-color); font-weight:700;">0</span></div>
+          <div class="session-stat">📈 <span id="sessionRpmDisplay">0.0</span>/h</div>
+        </div>
       </div>
 
+      <!-- HAUPTBEREICH -->
       <div class="main">
         <div class="timers">
           <div id="list" class="hidden"></div>
@@ -698,7 +676,6 @@
           <div class="chatBox">
             <strong>Chat</strong>
             <div id="chatBox"></div>
-
             <div class="chatInputRow">
               <input id="chatInput" placeholder="Nachricht..." onkeydown="if(event.key === 'Enter') sendChat()">
               <button onclick="sendChat()" style="background: var(--primary-color); color: #ffffff; border-color: var(--primary-color);">Send</button>
@@ -711,9 +688,8 @@
 
     <div id="toast"></div>
 
-    <script>
+<script>
       let domCache = {};
-
       const currentTheme = localStorage.getItem("theme") || "light";
       document.documentElement.setAttribute("data-theme", currentTheme);
 
@@ -734,22 +710,13 @@
         localStorage.setItem("compactMode", isCompact);
       }
 
-      // TASTATUR-HOTKEY LOGIK (NUMPAD 1-8 ODER DIGIT 1-8)
       document.addEventListener("keydown", (e) => {
         if (!ROOM) return;
         if (["INPUT", "TEXTAREA"].includes(document.activeElement.tagName)) return;
-
         let channelNum = null;
-        if (e.code.startsWith("Numpad") && e.code.length === 7) {
-          channelNum = parseInt(e.code.charAt(6));
-        } else if (e.code.startsWith("Digit") && e.code.length === 6) {
-          channelNum = parseInt(e.code.charAt(5));
-        }
-
-        if (channelNum >= 1 && channelNum <= 8) {
-          e.preventDefault();
-          start(channelNum);
-        }
+        if (e.code.startsWith("Numpad") && e.code.length === 7) channelNum = parseInt(e.code.charAt(6));
+        else if (e.code.startsWith("Digit") && e.code.length === 6) channelNum = parseInt(e.code.charAt(5));
+        if (channelNum >= 1 && channelNum <= 8) { e.preventDefault(); killMetin(channelNum); }
       });
 
       window.addEventListener('DOMContentLoaded', () => {
@@ -763,10 +730,7 @@
 
       function submitUsername() {
         const username = document.getElementById("username").value.trim();
-        if (!username) {
-          showMessage("⚠ Bitte trage zuerst einen Spielernamen ein!");
-          return;
-        }
+        if (!username) { showMessage("⚠ Bitte trage zuerst einen Spielernamen ein!"); return; }
         localStorage.setItem("savedNickname", username);
         document.getElementById("stepUsernameBox").className = "setup-box exit-left";
         document.getElementById("stepRoomsBox").className = "setup-box active";
@@ -799,37 +763,34 @@
       const db = firebase.database();
       let ROOM = null;
       let timersData = {};
+      let sessionData = { startTime: 0, count: 0, running: false };
       let lastRemaining = {};
       let domStates = {};
       let roomRef = null;
       let chatRef = null;
       let usersRef = null;
+      let sessionRef = null;
 
       const FIXED_ROOMS = ["Orctal Schatten 1", "Orctal Schatten 2", "Orctal Seele 1", "Orctal Seele 2"];
 
       function toggleSidebar(open) {
         const overlay = document.getElementById("sidebarOverlay");
         const sidebar = document.getElementById("sidebar");
-        if(open) {
-          overlay.classList.add("active");
-          sidebar.classList.add("active");
-        } else {
-          overlay.classList.remove("active");
-          sidebar.classList.remove("active");
-        }
+        overlay.classList.toggle("active", open);
+        sidebar.classList.toggle("active", open);
       }
 
       function initFixedRooms() {
-        FIXED_ROOMS.forEach(room => {
-          db.ref(`rooms/${room}/isFixed`).set(true);
-        });
+        FIXED_ROOMS.forEach(room => db.ref(`rooms/${room}/isFixed`).set(true));
       }
 
       function updateUI() {
         const inRoom = !!ROOM;
         document.getElementById("leaveBox").classList.toggle("hidden", !inRoom);
         document.getElementById("lobbyContainer").classList.toggle("hidden", inRoom);
-        
+        document.getElementById("panelRow").classList.toggle("active", inRoom);
+        document.getElementById("usersBox").classList.toggle("active", inRoom);
+
         if (inRoom) {
           document.getElementById("roomLabel").innerHTML = `Aktiv: <span style="color: var(--primary-color); font-weight:700;">${ROOM}</span>`;
         } else {
@@ -840,41 +801,34 @@
       function speak(text) {
         if (document.getElementById("muteVoice").checked) return;
         if (speechSynthesis.speaking) speechSynthesis.cancel();
-        
         setTimeout(() => {
           const msg = new SpeechSynthesisUtterance(text);
           msg.lang = "de-DE";
-          const voices = speechSynthesis.getVoices();
-          if (voices.length) msg.voice = voices.find(v => v.lang.includes("de")) || voices[0];
           speechSynthesis.speak(msg);
         }, 30);
       }
 
-      function testAudio() {
-        speak("Audio Test erfolgreich.");
-      }
-
       function showMessage(msg) {
         const t = document.getElementById("toast");
-        t.innerText = msg;
-        t.style.display = "block";
+        t.innerText = msg; t.style.display = "block";
         setTimeout(() => t.style.display = "none", 2500);
       }
 
       function setRoom(r) {
         ROOM = r;
-        const localBackup = localStorage.getItem(`backup_timers_${ROOM}`);
-        if (localBackup && Object.keys(timersData).length === 0) {
-          try { timersData = JSON.parse(localBackup); } catch(e){}
+        
+        // Wichtig: Beim Raumwechsel alten Render-Zustand komplett nullen, 
+        // damit das Skript gezwungen wird, die UI von Grund auf neu zu zeichnen.
+        for (let i = 1; i <= 8; i++) {
+          domStates[i] = { status: "", text: "", user: "" };
         }
-
+        
         document.getElementById("list").classList.remove("hidden");
-        document.getElementById("settings").classList.add("active");
-        document.getElementById("usersBox").classList.add("active");
         updateUI();
         listenRoom();
         listenChat();
         listenUsers();
+        listenSession();
         registerUser();
       }
 
@@ -884,44 +838,24 @@
           if (!FIXED_ROOMS.includes(ROOM)) {
             db.ref(`rooms/${ROOM}/users`).once("value", snap => {
               const users = snap.val() || {};
-              const uids = Object.keys(users);
-              if (uids.length <= 1 && uids.includes(myUid)) {
-                db.ref(`rooms/${ROOM}`).remove();
-              } else {
-                db.ref(`rooms/${ROOM}/users/${myUid}`).remove();
-              }
+              if (Object.keys(users).length <= 1 && users[myUid]) db.ref(`rooms/${ROOM}`).remove();
+              else db.ref(`rooms/${ROOM}/users/${myUid}`).remove();
             });
           } else {
             db.ref(`rooms/${ROOM}/users/${myUid}`).remove();
           }
-          db.ref(`rooms/${ROOM}/users/${myUid}`).onDisconnect().cancel();
-          db.ref(`rooms/${ROOM}`).onDisconnect().cancel();
         }
 
         if (roomRef) roomRef.off();
         if (chatRef) chatRef.off();
         if (usersRef) usersRef.off();
-        roomRef = chatRef = usersRef = null;
-        speechSynthesis.cancel();
-        
-        // --- HIER IST DIE REPARATUR ---
-        ROOM = null; 
-        timersData = {}; 
-        lastRemaining = {}; 
-        
-        // Setzt die internen Zustände für alle 8 Channels komplett zurück
-        domStates = {};
-        for (let i = 1; i <= 8; i++) {
-          domStates[i] = {};
-        }
-        // ------------------------------
+        if (sessionRef) sessionRef.off();
+        roomRef = chatRef = usersRef = sessionRef = null;
+        ROOM = null; timersData = {}; lastRemaining = {}; domStates = {};
 
         document.getElementById("list").classList.add("hidden");
-        document.getElementById("settings").classList.remove("active");
-        document.getElementById("usersBox").classList.remove("active");
         document.getElementById("userList").innerHTML = "";
         document.getElementById("chatBox").innerHTML = "";
-        
         document.getElementById("stepUsernameBox").className = "setup-box exit-left";
         document.getElementById("stepRoomsBox").className = "setup-box active";
         updateUI();
@@ -937,14 +871,8 @@
         db.ref("rooms").on("value", snap => {
           const fbRooms = snap.val() || {};
           const list = document.getElementById("roomList");
-          const activeRoomNames = Object.keys(fbRooms);
-          
-          let roomsHTML = FIXED_ROOMS.map(room => {
-            const count = Object.keys(fbRooms[room]?.users || {}).length;
-            return createRoomRowHTML(room, count, true);
-          });
-
-          activeRoomNames.forEach(room => {
+          let roomsHTML = FIXED_ROOMS.map(room => createRoomRowHTML(room, Object.keys(fbRooms[room]?.users || {}).length, true));
+          Object.keys(fbRooms).forEach(room => {
             if (!FIXED_ROOMS.includes(room)) {
               const count = Object.keys(fbRooms[room]?.users || {}).length;
               if (count > 0) roomsHTML.push(createRoomRowHTML(room, count, false));
@@ -955,249 +883,219 @@
       }
 
       function createRoomRowHTML(name, userCount, isFixed) {
-        const icon = isFixed ? "⭐" : "🕒";
-        const label = isFixed ? "Fester Raum" : "Temporär";
-        return `
-<div class="room-item">
-  <div style="min-width: 0; flex: 1;">
-    <strong style="word-break: break-all; font-size:14px;">${icon} ${name}</strong>
-    <div style="font-size:11px;color:var(--topbar-subtext);margin-top:2px;">👥 ${userCount} online • <span>${label}</span></div>
-  </div>
-  <button onclick="quickJoin('${name}')" style="padding:5px 12px; font-size:12px;">Join</button>
-</div>`;
+        return `<div class="room-item"><div style="min-width: 0; flex: 1;"><strong style="word-break: break-all; font-size:14px;">${isFixed?"⭐":"🕒"} ${name}</strong><div style="font-size:11px;color:var(--topbar-subtext);margin-top:2px;">👥 ${userCount} online</div></div><button onclick="quickJoin('${name}')" style="padding:5px 12px; font-size:12px;">Join</button></div>`;
       }
 
-      function quickJoin(room) {
-        const u = requireUsername(); if (!u) return;
-        setRoom(room); showMessage("Connected: " + room);
-      }
-
-      function joinRoom() {
-        const room = document.getElementById("roomInput").value.trim();
-        if (!room) return showMessage("⚠ Room Name fehlt");
-        const user = requireUsername(); if (!user) return;
-        
-        if (FIXED_ROOMS.includes(room)) {
-          setRoom(room); showMessage("🔵 Verbunden mit Channel");
-        } else {
-          db.ref(`rooms/${room}`).once("value", snap => {
-            if (!snap.exists() || !snap.child("users").exists()) {
-              showMessage("❌ Channel existiert nicht oder ist inaktiv"); return;
-            }
-            setRoom(room); showMessage("🔵 Verbunden mit Channel");
-          });
-        }
-      }
-
-      function createRoom() {
-        const room = document.getElementById("roomInput").value.trim();
-        if (!room) return showMessage("⚠ Room Name fehlt");
-        const user = requireUsername(); if (!user) return;
-        
-        if (FIXED_ROOMS.includes(room)) {
-          setRoom(room); showMessage("⚠ Das ist ein fester Channel – verbunden"); return;
-        }
-
-        db.ref(`rooms/${room}`).once("value", snap => {
-          if (snap.exists() && snap.child("users").exists()) {
-            setRoom(room); showMessage("⚠ Channel existiert bereits – verbunden"); return;
-          }
-          setRoom(room); showMessage("✅ Temporärer Channel erstellt");
-        });
-      }
+      function quickJoin(room) { const u = requireUsername(); if (u) setRoom(room); }
+      function joinRoom() { const room = document.getElementById("roomInput").value.trim(); if (room && requireUsername()) setRoom(room); }
+      function createRoom() { const room = document.getElementById("roomInput").value.trim(); if (room && requireUsername()) setRoom(room); }
 
       function registerUser() {
         const uid = firebase.auth().currentUser.uid;
         const name = document.getElementById("username").value.trim() || "User";
-        const myUserRef = db.ref(`rooms/${ROOM}/users/${uid}`);
-        myUserRef.set(name);
-        
-        if (!FIXED_ROOMS.includes(ROOM)) {
-          db.ref(`rooms/${ROOM}/users`).once("value", snap => {
-            if (Object.keys(snap.val() || {}).length <= 1) {
-              db.ref(`rooms/${ROOM}`).onDisconnect().remove();
-            } else {
-              myUserRef.onDisconnect().remove();
-              db.ref(`rooms/${ROOM}`).onDisconnect().cancel();
-            }
-          });
-        } else {
-          myUserRef.onDisconnect().remove();
-        }
+        db.ref(`rooms/${ROOM}/users/${uid}`).set(name);
+        db.ref(`rooms/${ROOM}/users/${uid}`).onDisconnect().remove();
       }
 
       function listenUsers() {
-        if (usersRef) usersRef.off();
         usersRef = db.ref(`rooms/${ROOM}/users`);
         usersRef.on("value", snap => {
-          document.getElementById("userList").innerHTML =
-            Object.values(snap.val() || {}).map(u => `<div style="padding:4px 0; font-size:13px; font-weight: 500;">🔹 ${u}</div>`).join("");
+          document.getElementById("userList").innerHTML = Object.values(snap.val() || {}).map(u => `<div style="padding:4px 0; font-size:13px; font-weight: 500;">🔹 ${u}</div>`).join("");
         });
       }
 
       function sendChat() {
-        const input = document.getElementById("chatInput");
-        const text = input.value.trim(); if (!text) return;
-        const chatRef = db.ref(`rooms/${ROOM}/chat`);
-        
-        chatRef.push({
-          user: document.getElementById("username").value.trim() || "User",
-          text, timestamp: Date.now()
-        });
-        
-        input.value = ""; input.focus();
-
-        chatRef.once("value", snap => {
-          if (snap.exists()) {
-            const data = snap.val(); const keys = Object.keys(data);
-            if (keys.length > 10) {
-              const sorted = keys.sort((a, b) => data[a].timestamp - data[b].timestamp);
-              for (let i = 0; i < sorted.length - 10; i++) chatRef.child(sorted[i]).remove();
-            }
-          }
-        });
+        const input = document.getElementById("chatInput"); if (!input.value.trim()) return;
+        db.ref(`rooms/${ROOM}/chat`).push({ user: document.getElementById("username").value.trim() || "User", text: input.value.trim(), timestamp: Date.now() });
+        input.value = "";
       }
 
       function listenChat() {
-        if (chatRef) chatRef.off();
         chatRef = db.ref(`rooms/${ROOM}/chat`);
         chatRef.limitToLast(10).on("value", snap => {
           const box = document.getElementById("chatBox");
-          const msgs = Object.values(snap.val() || {}).sort((a, b) => a.timestamp - b.timestamp);
-          box.innerHTML = msgs.map(m => {
-            const d = new Date(m.timestamp);
-            return `
-<div style="border-bottom:1px solid var(--border-color);margin-bottom:6px;padding-bottom:6px;word-break: break-word;">
-<div style="font-size:11px;color:var(--topbar-subtext); font-weight: 500;">
-${d.toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"})} • <span style="color:var(--primary-color); font-weight:600;">${m.user}</span>
-</div>
-<div style="font-size:13px; margin-top:2px;">${m.text}</div>
-</div>`;
-          }).join("");
+          box.innerHTML = Object.values(snap.val() || {}).sort((a,b)=>a.timestamp-b.timestamp).map(m => `<div style="border-bottom:1px solid var(--border-color);margin-bottom:6px;padding-bottom:6px;word-break: break-word;"><div style="font-size:11px;color:var(--topbar-subtext); font-weight: 500;">${new Date(m.timestamp).toLocaleTimeString()} • <span style="color:var(--primary-color);">${m.user}</span></div><div style="font-size:13px; margin-top:2px;">${m.text}</div></div>`).join("");
           box.scrollTop = box.scrollHeight;
         });
       }
 
       function listenRoom() {
-        if (roomRef) roomRef.off();
         roomRef = db.ref(`rooms/${ROOM}/timers`);
         roomRef.on("value", snap => { 
           timersData = snap.val() || {}; 
-          if (ROOM) localStorage.setItem(`backup_timers_${ROOM}`, JSON.stringify(timersData));
-          renderAll(); 
+          renderAll(true); 
         });
       }
-      
-      setInterval(renderAll, 1000);
+
+      function listenSession() {
+        sessionRef = db.ref(`rooms/${ROOM}/session`);
+        sessionRef.on("value", snap => {
+          sessionData = snap.val() || { startTime: 0, count: 0, running: false };
+          const btn = document.getElementById("sessionBtn");
+          if (sessionData.running) {
+            btn.innerText = "⏸ Pause Session";
+            btn.style.background = "var(--color-orange)";
+            btn.style.borderColor = "var(--color-orange)";
+          } else {
+            btn.innerText = "▶ Start Session";
+            btn.style.background = "var(--primary-color)";
+            btn.style.borderColor = "var(--primary-color)";
+          }
+          document.getElementById("sessionCountDisplay").innerText = sessionData.count || 0;
+        });
+      }
+
+      function toggleSession() {
+        if (!ROOM) return;
+        if (!sessionData.running) {
+          const currentElapsed = sessionData.elapsedTime || 0;
+          db.ref(`rooms/${ROOM}/session`).update({
+            running: true,
+            startTime: Date.now() - currentElapsed
+          });
+        } else {
+          const totalElapsed = Date.now() - sessionData.startTime;
+          db.ref(`rooms/${ROOM}/session`).update({
+            running: false,
+            elapsedTime: totalElapsed
+          });
+        }
+      }
+
+      function resetSession() {
+        if (!ROOM) return;
+        if (confirm("Möchtest du die Session-Statistiken und alle Metin-Zähler auf 0 setzen?")) {
+          db.ref(`rooms/${ROOM}/session`).set({ startTime: 0, count: 0, running: false, elapsedTime: 0 });
+          for(let i=1; i<=8; i++) {
+            db.ref(`rooms/${ROOM}/timers/${i}/killCount`).set(0);
+          }
+          showMessage("🔄 Session zurückgesetzt!");
+        }
+      }
       
       const list = document.getElementById("list");
       for (let i = 1; i <= 8; i++) {
         list.innerHTML += `
 <div class="hud-card" id="card${i}">
-<div><strong>CH${i}</strong></div>
-<div class="center">
-  <div style="display:flex; gap:8px;">
-    <button onclick="start(${i})">Start</button>
-    <button onclick="resetTimer(${i})">Reset</button>
+  <div><strong>CH${i}</strong><span class="kill-counter-badge" id="badge${i}">⚔ 0</span></div>
+  <div class="center">
+    <div style="display:flex; gap:4px;">
+      <button onclick="killMetin(${i})" style="background:var(--primary-color); color:#fff; border-color:var(--primary-color);">Killed</button>
+      <button onclick="startTimerOnly(${i})">Start</button>
+      <button onclick="resetTimer(${i})">Reset</button>
+    </div>
+    <div class="card-user-tag" id="userTag${i}"></div>
   </div>
-  <div class="card-user-tag" id="userTag${i}"></div>
-</div>
-<div class="right">
-<span id="t${i}" style="font-family: monospace; font-size: 15px; font-weight: 700;">READY</span>
-<div class="dot green" id="dot${i}"></div>
-</div>
-<div class="progress-container">
-  <div class="progress-bar" id="pbar${i}"></div>
-</div>
+  <div>
+    <input type="text" class="ch-note-input" id="note${i}" placeholder="Notiz..." oninput="updateNoteInFirebase(${i})">
+  </div>
+  <div class="right">
+    <span id="t${i}" style="font-family: monospace; font-size: 15px; font-weight: 700;">READY</span>
+    <div class="dot green" id="dot${i}"></div>
+  </div>
+  <div class="progress-container"><div class="progress-bar" id="pbar${i}"></div></div>
 </div>`;
-      }
+}
 
       for (let i = 1; i <= 8; i++) {
         domCache[i] = {
-          text: document.getElementById("t" + i),
-          card: document.getElementById("card" + i),
-          dot: document.getElementById("dot" + i),
-          pbar: document.getElementById("pbar" + i),
-          userTag: document.getElementById("userTag" + i)
+          text: document.getElementById("t" + i), card: document.getElementById("card" + i), dot: document.getElementById("dot" + i),
+          pbar: document.getElementById("pbar" + i), userTag: document.getElementById("userTag" + i), noteField: document.getElementById("note" + i),
+          badge: document.getElementById("badge" + i)
         };
-        domStates[i] = {};
+        domStates[i] = { status: "", text: "", user: "" };
       }
 
-      function renderAll() {
+      function updateNoteInFirebase(ch) {
+        if (!ROOM) return;
+        const noteValue = domCache[ch].noteField.value;
+        if (!timersData[ch]) {
+          db.ref(`rooms/${ROOM}/timers/${ch}`).set({ startTime: 0, duration: 0, user: "", note: noteValue, killCount: 0 });
+        } else {
+          db.ref(`rooms/${ROOM}/timers/${ch}/note`).set(noteValue);
+        }
+      }
+
+      setInterval(() => {
+        renderAll(false);
+        renderSessionClock();
+      }, 1000);
+
+      function renderSessionClock() {
+        if (!ROOM) return;
+        let elapsedMs = 0;
+        if (sessionData.running && sessionData.startTime > 0) {
+          elapsedMs = Date.now() - sessionData.startTime;
+        } else if (sessionData.elapsedTime) {
+          elapsedMs = sessionData.elapsedTime;
+        }
+
+        if (elapsedMs <= 0) {
+          document.getElementById("sessionTimeDisplay").innerText = "00:00:00";
+          document.getElementById("sessionRpmDisplay").innerText = "0.0";
+          return;
+        }
+
+        const totalSecs = Math.floor(elapsedMs / 1000);
+        const h = Math.floor(totalSecs / 3600);
+        const m = Math.floor((totalSecs % 3600) / 60);
+        const s = totalSecs % 60;
+        document.getElementById("sessionTimeDisplay").innerText = `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`;
+
+        const totalHours = totalSecs / 3600;
+        const currentCount = sessionData.count || 0;
+        const mph = totalHours > 0 ? (currentCount / totalHours).toFixed(1) : "0.0";
+        document.getElementById("sessionRpmDisplay").innerText = mph;
+      }
+
+      function renderAll(forceUpdate = false) {
         for (let i = 1; i <= 8; i++) {
-          const cache = domCache[i];
-          const data = timersData[i];
-          const state = domStates[i];
+          const cache = domCache[i]; const data = timersData[i]; const state = domStates[i];
           
-          if (!data) {
+          if (forceUpdate) {
+            state.status = ""; state.text = ""; state.user = "";
+          }
+
+          const currentNoteVal = (data && data.note) ? data.note : "";
+          if (document.activeElement !== cache.noteField && cache.noteField.value !== currentNoteVal) cache.noteField.value = currentNoteVal;
+
+          const currentKills = (data && data.killCount) ? data.killCount : 0;
+          const badgeText = `⚔ ${currentKills}`;
+          if (cache.badge.innerText !== badgeText) cache.badge.innerText = badgeText;
+
+          if (!data || (data.startTime === 0 && data.duration === 0)) {
             if (state.status !== "READY") {
-              cache.text.innerText = "READY";
-              cache.dot.className = "dot green";
-              cache.card.className = "hud-card";
-              cache.pbar.style.width = "0%";
-              cache.userTag.innerText = "";
-              state.status = "READY";
-              state.user = "";
+              cache.text.innerText = "READY"; cache.dot.className = "dot green"; cache.card.className = "hud-card"; cache.pbar.style.width = "0%"; cache.userTag.innerText = "";
+              state.status = "READY"; state.user = "";
             }
-            lastRemaining[i] = null; 
-            continue;
+            lastRemaining[i] = null; continue;
           }
 
           const starterName = data.user ? `👤 ${data.user}` : "";
-          if (state.user !== starterName) {
-            cache.userTag.innerText = starterName;
-            state.user = starterName;
-          }
-          
+          if (state.user !== starterName) { cache.userTag.innerText = starterName; state.user = starterName; }
+
           const remaining = data.duration - ((Date.now() - data.startTime) / 1000);
-          
           if (remaining > 0) {
-            const m = Math.floor(remaining / 60); 
-            const s = Math.floor(remaining % 60);
-            const timeText = `${m}:${String(s).padStart(2,"0")}`;
-            const isCritical = remaining < 60;
-            
-            if (state.text !== timeText) {
-              cache.text.innerText = timeText;
-              state.text = timeText;
-            }
-            
+            const m = Math.floor(remaining / 60); const s = Math.floor(remaining % 60);
+            const timeText = `${m}:${String(s).padStart(2,"0")}`; const isCritical = remaining < 60;
+            if (state.text !== timeText) { cache.text.innerText = timeText; state.text = timeText; }
             const targetStatus = isCritical ? "CRITICAL" : "RUNNING";
             if (state.status !== targetStatus) {
-              cache.dot.className = isCritical ? "dot orange" : "dot red";
-              cache.card.className = isCritical ? "hud-card orangeWarn" : "hud-card timer-running";
-              cache.pbar.style.backgroundColor = isCritical ? "var(--color-orange)" : "var(--color-red)";
-              state.status = targetStatus;
+              cache.dot.className = isCritical ? "dot orange" : "dot red"; cache.card.className = isCritical ? "hud-card orangeWarn" : "hud-card timer-running";
+              cache.pbar.style.backgroundColor = isCritical ? "var(--color-orange)" : "var(--color-red)"; state.status = targetStatus;
             }
-            
-            const pct = Math.min(((data.duration - remaining) / data.duration) * 100, 100);
-            cache.pbar.style.width = `${pct}%`;
-            
+            cache.pbar.style.width = `${Math.min(((data.duration - remaining) / data.duration) * 100, 100)}%`;
           } else {
-            const over = Math.abs(remaining); 
-            const m = Math.floor(over / 60); 
-            const s = Math.floor(over % 60);
-            const timeText = `+${m}:${String(s).padStart(2,"0")}`;
-            const isOverTen = over > 10;
+            const over = Math.abs(remaining); const m = Math.floor(over / 60); const s = Math.floor(over % 60);
+            const timeText = `+${m}:${String(s).padStart(2,"0")}`; 
+            if (state.text !== timeText) { cache.text.innerText = timeText; state.text = timeText; }
             
-            if (state.text !== timeText) {
-              cache.text.innerText = timeText;
-              state.text = timeText;
+            if (state.status !== "OVERTIME") {
+              cache.dot.className = "dot green"; 
+              cache.card.className = "hud-card greenWarn";
+              cache.pbar.style.width = "100%"; cache.pbar.style.backgroundColor = "var(--color-green)"; state.status = "OVERTIME";
             }
-            
-            const targetStatus = isOverTen ? "OVERTIME_PULSE" : "OVERTIME";
-            if (state.status !== targetStatus) {
-              cache.dot.className = "dot green";
-              cache.card.className = isOverTen ? "hud-card greenWarn overtime-pulse" : "hud-card greenWarn";
-              cache.pbar.style.width = "100%";
-              cache.pbar.style.backgroundColor = "var(--color-green)";
-              state.status = targetStatus;
-            }
-            
-            if (lastRemaining[i] > 0) {
-              speak("CH " + i + " ready");
-              if (navigator.vibrate) navigator.vibrate([300, 100, 300]);
-            }
+            if (!forceUpdate && lastRemaining[i] > 0) { speak("CH " + i + " ready"); if (navigator.vibrate) navigator.vibrate([300, 100, 300]); }
           }
           lastRemaining[i] = remaining;
         }
@@ -1205,33 +1103,52 @@ ${d.toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"})} • <span sty
 
       function parseMinutes(v) { return Math.floor(parseFloat(v.replace(",", ".")) * 60); }
 
-      function start(ch) {
+      function startTimerOnly(ch) {
         if (!ROOM) return;
         const durationSec = parseMinutes(document.getElementById("minutesInput").value);
         const myName = document.getElementById("username").value.trim() || "User";
+        const currentKills = timersData[ch]?.killCount || 0;
+        const existingNote = domCache[ch].noteField.value;
+
         db.ref(`rooms/${ROOM}/timers/${ch}`).set({
           startTime: Date.now(),
           duration: durationSec,
-          user: myName
+          user: myName,
+          note: existingNote,
+          killCount: currentKills
         });
       }
 
-      function resetTimer(ch) { if (ROOM) db.ref(`rooms/${ROOM}/timers/${ch}`).remove(); }
+      function killMetin(ch) {
+        if (!ROOM) return;
+        
+        startTimerOnly(ch);
+
+        const currentChKills = timersData[ch]?.killCount || 0;
+        db.ref(`rooms/${ROOM}/timers/${ch}/killCount`).set(currentChKills + 1);
+
+        const currentGlobalKills = sessionData.count || 0;
+        db.ref(`rooms/${ROOM}/session/count`).set(currentGlobalKills + 1);
+        
+        showMessage(`⚔ CH${ch} Metin gewertet! (+1)`);
+      }
+
+      function resetTimer(ch) { 
+        if (!ROOM) return;
+        const existingNote = domCache[ch].noteField.value;
+        const currentKills = timersData[ch]?.killCount || 0;
+        db.ref(`rooms/${ROOM}/timers/${ch}`).set({
+          startTime: 0, duration: 0, user: "", note: existingNote, killCount: currentKills
+        });
+      }
 
       function resetAllTimers() {
         if (!ROOM) return;
-        if (confirm("Möchtest du wirklich ALLE Timer in diesem Raum zurücksetzen?")) {
-          db.ref(`rooms/${ROOM}/timers`).remove().then(() => {
-            showMessage("🔄 Alle Timer wurden zurückgesetzt!");
-          }).catch(err => {
-            showMessage("❌ Fehler beim Zurücksetzen: " + err.message);
-          });
+        if (confirm("Möchtest du alle aktiven Timer zurücksetzen? (Zähler und Notizen bleiben erhalten)")) {
+          for(let i = 1; i <= 8; i++) resetTimer(i);
+          showMessage("🔄 Alle Timer zurückgesetzt!");
         }
       }
-      
-      updateUI();
     </script>
-
   </body>
-
 </html>
